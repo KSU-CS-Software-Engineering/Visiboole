@@ -23,6 +23,7 @@ namespace VisiBoole.ParsingEngine.Statements
         /// <param name="txt">The raw, unparsed text of this statement</param>
 		public SubmoduleInstantiationStmt(SubDesign sd, int lnNum, string txt) : base(sd, lnNum, txt)
 		{
+
 		}
 
 	    /// <summary>
