@@ -64,22 +64,27 @@ namespace VisiBoole.Models
 			else
 			{
 				//Globals.CurrentTab = subDesign.FileSourceName;
+                /*
 				int newValue = Negate(subDesign.Variables[variableClicked]);
 				subDesign.Variables[variableClicked] = newValue;
+                */
 
 				//build list of all dependent variables based on user click
 				List<string> totalVariables = new List<string>();
 
+                /*
 				foreach (string dependentVariable in subDesign.Dependencies[variableClicked])
 				{
 					totalVariables.Add(dependentVariable);
 				}
+                */
 
 				int count = 0;
 				int end = totalVariables.Count;
 
 				while (count != end)
 				{
+                    /*
 					for (int i = count; i < end; i++)
 					{
 						foreach (string dependentVariable in subDesign.Dependencies[totalVariables[i]])
@@ -89,14 +94,17 @@ namespace VisiBoole.Models
 					}
 					count = end;
 					end = totalVariables.Count;
+                    */
 				}
 
 				foreach (string dependentVariable in totalVariables)
 				{
 					//currentDependent is used in SolveExpression()
+                    /*
 					currentDependent = dependentVariable;
 					int updatedVariable = SolveExpression(subDesign.Expressions[dependentVariable], -1);
 					subDesign.Variables[dependentVariable] = updatedVariable;
+                    */
 				}
 
 				// TODO: HACK -> FIX THIS (_formatSpecifiers is static)
@@ -167,6 +175,7 @@ namespace VisiBoole.Models
 					// add to our list the value of each variable
 					for (int i = beg; i < end; i++)
 					{
+                        /*
 						string key = string.Concat(var, i);
 						if (subDesign.Variables.ContainsKey(key))
 						{
@@ -178,6 +187,7 @@ namespace VisiBoole.Models
 							// TODO: throw a proper error with metadata
 							throw new Exception();
 						}
+                        */
 					}
 				}
 				else
@@ -188,6 +198,7 @@ namespace VisiBoole.Models
 					foreach (Match m in matches)
 					{
 						// add to our list the value of each variable
+                        /*
 						if (subDesign.Variables.ContainsKey(m.Value))
 						{
 							elems.Add(subDesign.Variables[m.Value]);
@@ -198,6 +209,7 @@ namespace VisiBoole.Models
 							// TODO: throw a proper error with metadata
 							throw new Exception();
 						}
+                        */
 					}
 				}
 
@@ -242,18 +254,22 @@ namespace VisiBoole.Models
 				{
 					if (s.Contains('*'))
 					{
-						if (!subDesign.Variables.ContainsKey(s.Substring(1)))
+						if (!subDesign.Database.AllVars.ContainsKey(s.Substring(1)))
 						{
-							subDesign.Variables.Add(s.Substring(1), 1);
-							subDesign.Dependencies[s.Substring(1)] = new List<string>();
+                            /*
+							subDesign.Database.AllVars.Add(s.Substring(1), 1);
+							subDesign.Database.Dependencies[s.Substring(1)] = new List<string>();
+                            */
 						}
 					}
 					else
 					{
-						if (!subDesign.Variables.ContainsKey(s))
+						if (!subDesign.Database.AllVars.ContainsKey(s))
 						{
+                            /*
 							subDesign.Variables.Add(s, 0);
 							subDesign.Dependencies[s] = new List<string>();
+                            */
 						}
 					}
 				}
@@ -262,19 +278,21 @@ namespace VisiBoole.Models
 			{
 				string dependent = lineOfCode.Substring(0, lineOfCode.IndexOf('='));
 				currentDependent = dependent.Trim();
-				if (!subDesign.Dependencies.ContainsKey(currentDependent))
+				if (!subDesign.Database.Dependencies.ContainsKey(currentDependent))
 				{
-					subDesign.Dependencies.Add(currentDependent, new List<string>());
+					subDesign.Database.Dependencies.Add(currentDependent, new List<string>());
 				}
 				string expression = lineOfCode.Substring(lineOfCode.IndexOf('=') + 1).Trim();
-				if (!subDesign.Expressions.ContainsKey(currentDependent))
+				if (!subDesign.Database.Expressions.ContainsKey(currentDependent))
 				{
-					subDesign.Expressions.Add(currentDependent, expression);
+					subDesign.Database.Expressions.Add(currentDependent, expression);
 				}
 				int x = SolveExpression(expression, lineNumber);
-				if (!subDesign.Variables.ContainsKey(dependent.Trim()))
+				if (!subDesign.Database.AllVars.ContainsKey(dependent.Trim()))
 				{
-					subDesign.Variables.Add(dependent.Trim(), x);
+                    /*
+					subDesign.Database.AllVars.Add(dependent.Trim(), x);
+                    */
 				}
 				return expression;
 			}
@@ -366,6 +384,7 @@ namespace VisiBoole.Models
                 string newVariable = oldVariable.Substring(1);
 
                 // check to see variable is in subdesign
+                /*
                 if (subDesign.Variables.ContainsKey(newVariable))
                 {
                     // applies [not] gate to the variable
@@ -386,6 +405,7 @@ namespace VisiBoole.Models
                     }
                 }
                 notGate = basicExpression.IndexOf('~');
+                */
             }
 
             ///
@@ -424,6 +444,7 @@ namespace VisiBoole.Models
                         inputs[i] = 0;
                     }
                     // check to see variable is in subdesign
+                    /*
                     if (subDesign.Variables.ContainsKey(elements[i]))
                     {
                         //set input
@@ -434,6 +455,7 @@ namespace VisiBoole.Models
                             subDesign.Dependencies[elements[i]].Add(currentDependent);
                         }
                     }
+                    */
                 }
 
                 // applies [and] gate to each input/expression
@@ -481,6 +503,7 @@ namespace VisiBoole.Models
                 else
                 {
                     // check to see variable is in subdesign
+                    /*
                     if (subDesign.Variables.ContainsKey(orExpression[i]))
                     {
                         // get the boolean value of the variable
@@ -499,6 +522,7 @@ namespace VisiBoole.Models
                     {
                         subDesign.Dependencies[orExpression[i]].Add(currentDependent);
                     }
+                    */
                 }
             }
 

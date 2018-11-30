@@ -251,7 +251,7 @@ namespace VisiBoole.Controllers
                 return;
             }
 
-            HtmlBuilder html = new HtmlBuilder(output);
+            HtmlBuilder html = new HtmlBuilder(sd, output);
             if (html.HtmlText == null)
             {
                 return;
@@ -275,7 +275,7 @@ namespace VisiBoole.Controllers
             SubDesign sd = tabControl.SelectedTab.SubDesign();
             Parser p = new Parser();
             List<IObjectCodeElement> output = p.Parse(sd, null, true);
-            HtmlBuilder html = new HtmlBuilder(output);
+            HtmlBuilder html = new HtmlBuilder(sd, output);
             string htmlOutput = html.GetHTML();
 
             browser.ObjectForScripting = this;
@@ -301,7 +301,7 @@ namespace VisiBoole.Controllers
                 return;
             }
 
-            HtmlBuilder html = new HtmlBuilder(output);
+            HtmlBuilder html = new HtmlBuilder(sd, output);
             if (html.HtmlText == null)
             {
                 return;

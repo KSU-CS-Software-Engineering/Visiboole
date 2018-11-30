@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using VisiBoole.ParsingEngine.ObjectCode;
 using VisiBoole.ParsingEngine.Boolean;
+using VisiBoole.Models;
 
 namespace VisiBoole.ParsingEngine.Statements
 {
@@ -14,7 +15,7 @@ namespace VisiBoole.ParsingEngine.Statements
         private bool clock_tick;
         private bool initial_run;
 
-        public DffClockStmt(int lnNum, string txt, bool tick, bool init) : base(lnNum, txt)
+        public DffClockStmt(SubDesign sd, int lnNum, string txt, bool tick, bool init) : base(sd, lnNum, txt)
         {
             clock_tick = tick;
             initial_run = init;
@@ -30,7 +31,7 @@ namespace VisiBoole.ParsingEngine.Statements
 
             //get our dependent variable and expression
             string dependent = fullExpression.Substring(0, fullExpression.IndexOf('='));
-            //use for database calls (value)
+            //use for SubDesign.Database calls (value)
             string delay = dependent + ".d";
             //use to make output with (name)
             string delayDisplayAs = "<";
@@ -47,30 +48,30 @@ namespace VisiBoole.ParsingEngine.Statements
             if (clock_tick || initial_run)
             {
                 dependentValue = GetVariable(delay);
-                Database.SetValue(dependent, dependentValue);
+                SubDesign.Database.SetValue(dependent, dependentValue);
             }
 
             //make dependencies list
-            Database.CreateDependenciesList(delay);
+            SubDesign.Database.CreateDependenciesList(delay);
             //solve for delay;
             bool delayValue;
-            Expression exp = new Expression();
+            Expression exp = new Expression(SubDesign);
             delayValue = exp.Solve(expression);
             //get the delay variable
-            IndependentVariable delayVariable = Database.TryGetVariable<IndependentVariable>(delay) as IndependentVariable;
+            IndependentVariable delayVariable = SubDesign.Database.TryGetVariable<IndependentVariable>(delay) as IndependentVariable;
             if (delayVariable != null)
             {
-                Database.SetValue(delay, delayValue);
-                //Database.SetDepVar(delay, delayValue);
+                SubDesign.Database.SetValue(delay, delayValue);
+                //SubDesign.Database.SetDepVar(delay, delayValue);
             }
             else
             {
                 delayVariable = new IndependentVariable(delay, delayValue);
-                Database.AddVariable<IndependentVariable>(delayVariable);
+                SubDesign.Database.AddVariable<IndependentVariable>(delayVariable);
             }
             //make the output
-            IndependentVariable dependentInd = Database.TryGetVariable<IndependentVariable>(dependent) as IndependentVariable;
-            DependentVariable dependentDep = Database.TryGetVariable<DependentVariable>(dependent) as DependentVariable;
+            IndependentVariable dependentInd = SubDesign.Database.TryGetVariable<IndependentVariable>(dependent) as IndependentVariable;
+            DependentVariable dependentDep = SubDesign.Database.TryGetVariable<DependentVariable>(dependent) as DependentVariable;
             if (dependentInd != null)
             {
                 MakeOrderedOutputInd(dependentInd, delayVariable, delayDisplayAs, expression);
@@ -166,8 +167,8 @@ namespace VisiBoole.ParsingEngine.Statements
                 if (variable.Contains('~'))
                 {
                     string newVariable = variable.Substring(1);
-                    IndependentVariable indVar = Database.TryGetVariable<IndependentVariable>(newVariable) as IndependentVariable;
-                    DependentVariable depVar = Database.TryGetVariable<DependentVariable>(newVariable) as DependentVariable;
+                    IndependentVariable indVar = SubDesign.Database.TryGetVariable<IndependentVariable>(newVariable) as IndependentVariable;
+                    DependentVariable depVar = SubDesign.Database.TryGetVariable<DependentVariable>(newVariable) as DependentVariable;
                     if (indVar != null)
                     {
                         IndependentVariable var = new IndependentVariable(variable, indVar.Value);
@@ -187,8 +188,8 @@ namespace VisiBoole.ParsingEngine.Statements
                 else if (variable.Contains('~') && variable.Contains(';'))
                 {
                     string newVariable = variable.Substring(1, variable.IndexOf(';'));
-                    IndependentVariable indVar = Database.TryGetVariable<IndependentVariable>(newVariable) as IndependentVariable;
-                    DependentVariable depVar = Database.TryGetVariable<DependentVariable>(newVariable) as DependentVariable;
+                    IndependentVariable indVar = SubDesign.Database.TryGetVariable<IndependentVariable>(newVariable) as IndependentVariable;
+                    DependentVariable depVar = SubDesign.Database.TryGetVariable<DependentVariable>(newVariable) as DependentVariable;
                     if (indVar != null)
                     {
                         IndependentVariable var = new IndependentVariable(variable, indVar.Value);
@@ -211,8 +212,8 @@ namespace VisiBoole.ParsingEngine.Statements
                     {
                         variable = variable.Substring(0, variable.IndexOf(';'));
                     }
-                    IndependentVariable indVar = Database.TryGetVariable<IndependentVariable>(variable) as IndependentVariable;
-                    DependentVariable depVar = Database.TryGetVariable<DependentVariable>(variable) as DependentVariable;
+                    IndependentVariable indVar = SubDesign.Database.TryGetVariable<IndependentVariable>(variable) as IndependentVariable;
+                    DependentVariable depVar = SubDesign.Database.TryGetVariable<DependentVariable>(variable) as DependentVariable;
 
                     if (indVar != null)
                     {
@@ -240,17 +241,17 @@ namespace VisiBoole.ParsingEngine.Statements
 
         /// <summary>
         /// Returns the value of the variable matching the given name. If there is no match,
-        /// a new variable initialized to false is inserted into the database
+        /// a new variable initialized to false is inserted into the SubDesign.Database
         /// </summary>
         /// <param name="variableName">The name of the variable to search for</param>
         /// <returns>Returns the value of the variable matching the given name</returns>
         private bool GetVariable(string variableName)
         {
             //See if variable was already declared in IndependentVariables
-            IndependentVariable indVariable = Database.TryGetVariable<IndependentVariable>(variableName) as IndependentVariable;
+            IndependentVariable indVariable = SubDesign.Database.TryGetVariable<IndependentVariable>(variableName) as IndependentVariable;
 
             //See if variable was already declared in DependentVariables
-            DependentVariable depVariable = Database.TryGetVariable<DependentVariable>(variableName) as DependentVariable;
+            DependentVariable depVariable = SubDesign.Database.TryGetVariable<DependentVariable>(variableName) as DependentVariable;
 
             //If variable was found in IndependentVariables
             if (indVariable != null)
@@ -278,8 +279,8 @@ namespace VisiBoole.ParsingEngine.Statements
                 //create a variable with a false value since it was not declared
                 indVariable = new IndependentVariable(variableName, false);
 
-                //Now add the variable to the database
-                Database.AddVariable<IndependentVariable>(indVariable);
+                //Now add the variable to the SubDesign.Database
+                SubDesign.Database.AddVariable<IndependentVariable>(indVariable);
 
                 //Add variable to Output
                 //Output.Add(indVariable);

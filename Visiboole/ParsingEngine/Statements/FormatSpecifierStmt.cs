@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using VisiBoole.ErrorHandling;
+using VisiBoole.Models;
 using VisiBoole.ParsingEngine.ObjectCode;
 
 namespace VisiBoole.ParsingEngine.Statements
@@ -25,7 +26,7 @@ namespace VisiBoole.ParsingEngine.Statements
         /// </summary>
         /// <param name="lnNum">The line number that this statement is located on within edit mode - not simulation mode</param>
         /// <param name="txt">The raw, unparsed text of this statement</param>
-        public FormatSpecifierStmt(int lnNum, string txt) : base(lnNum, txt)
+        public FormatSpecifierStmt(SubDesign sd, int lnNum, string txt) : base(sd, lnNum, txt)
 		{
 		}
 
@@ -43,6 +44,9 @@ namespace VisiBoole.ParsingEngine.Statements
             regex = new Regex(@"[{};]", RegexOptions.None);
             string content = regex.Replace(Text.Substring(2), string.Empty);
 
+            /* Replace vectors if any */
+            content = ReplaceVectors(content);
+
             /* Split variables by whitespace */
             regex = new Regex(@"\s+", RegexOptions.None);
             string[] variables = regex.Split(content);
@@ -52,7 +56,7 @@ namespace VisiBoole.ParsingEngine.Statements
             foreach (string var in variables)
             {
                 /* Add value of each variable to output values */
-                int value = Database.TryGetValue(var);
+                int value = SubDesign.Database.TryGetValue(var);
                 if (value != -1)
                 {
                     valueList.Add(value);
@@ -60,7 +64,7 @@ namespace VisiBoole.ParsingEngine.Statements
                 else
                 {
                     IndependentVariable newVar = new IndependentVariable(var, false);
-                    Database.AddVariable<IndependentVariable>(newVar);
+                    SubDesign.Database.AddVariable<IndependentVariable>(newVar);
                     valueList.Add(0);
                 }
             }
