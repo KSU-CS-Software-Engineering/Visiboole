@@ -44,7 +44,7 @@ namespace VisiBoole.ParsingEngine.Statements
                 Output.Add(space);
             }
 
-            string fullExpression = Text.Substring(start); // Start expression with first non whitespace character
+            string fullExpression = Text.Substring(start, (Text.IndexOf(';') - start)); // Start expression with first non whitespace character
 
             //get our dependent variable and expression
             string dependent = fullExpression.Substring(0, fullExpression.IndexOf('='));

@@ -37,10 +37,39 @@ namespace VisiBoole.ParsingEngine
                 {
                     stmt.Parse();
                 }
-                List<IObjectCodeElement> output = new List<IObjectCodeElement>();
+
+                using (StreamWriter sw = new StreamWriter(@"U:\Documents\vars.txt"))
+                {
+                    sw.WriteLine("Ind:\n");
+                    foreach (KeyValuePair<string,IndependentVariable> kv in sd.Database.GetIndVars())
+                    {
+                        sw.WriteLine(kv.Key + ": " + kv.Value.Value);
+                    }
+                    sw.WriteLine("Dep:\n");
+                    foreach (KeyValuePair<string, DependentVariable> kv in sd.Database.GetDepVars())
+                    {
+                        sw.WriteLine(kv.Key + ": " + kv.Value.Value);
+                    }
+                }
+
+
+                    List<IObjectCodeElement> output = new List<IObjectCodeElement>();
                 foreach (Statement stmt in stmtList)
                 {
-                    output.AddRange(stmt.Output);
+                    List<IObjectCodeElement> stmtOutput = stmt.Output;
+                    for (int i = 0; i < stmtOutput.Count; i++)
+                    {
+                        IObjectCodeElement token = stmtOutput[i];
+                        if (token is IndependentVariable)
+                        {
+                            DependentVariable dv;
+                            if (sd.Database.GetDepVars().TryGetValue(((IndependentVariable)token).Name, out dv))
+                            {
+                                stmtOutput[i] = dv;
+                            }
+                        }
+                    }
+                    output.AddRange(stmtOutput);
                 }
                 return output;
             }
