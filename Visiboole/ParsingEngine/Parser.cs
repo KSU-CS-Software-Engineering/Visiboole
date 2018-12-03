@@ -38,38 +38,31 @@ namespace VisiBoole.ParsingEngine
                     stmt.Parse();
                 }
 
+                List<string> vars = new List<string>();
+                foreach (KeyValuePair<string, IndependentVariable> kv in sd.Database.GetIndVars())
+                {
+                    foreach (KeyValuePair<string, DependentVariable> kv1 in sd.Database.GetDepVars())
+                    {
+                        if (kv.Key.Equals(kv1.Key))
+                        {
+                            vars.Add(kv.Key + ": IValue = " + kv.Value.Value + " DValue = " + kv1.Value.Value);
+                        }
+                    }
+                }
+
                 using (StreamWriter sw = new StreamWriter(@"U:\Documents\vars.txt"))
                 {
-                    sw.WriteLine("Ind:\n");
-                    foreach (KeyValuePair<string,IndependentVariable> kv in sd.Database.GetIndVars())
+                    foreach (string s in vars)
                     {
-                        sw.WriteLine(kv.Key + ": " + kv.Value.Value);
-                    }
-                    sw.WriteLine("Dep:\n");
-                    foreach (KeyValuePair<string, DependentVariable> kv in sd.Database.GetDepVars())
-                    {
-                        sw.WriteLine(kv.Key + ": " + kv.Value.Value);
+                        sw.WriteLine(s);
                     }
                 }
 
 
-                    List<IObjectCodeElement> output = new List<IObjectCodeElement>();
+                List<IObjectCodeElement> output = new List<IObjectCodeElement>();
                 foreach (Statement stmt in stmtList)
                 {
-                    List<IObjectCodeElement> stmtOutput = stmt.Output;
-                    for (int i = 0; i < stmtOutput.Count; i++)
-                    {
-                        IObjectCodeElement token = stmtOutput[i];
-                        if (token is IndependentVariable)
-                        {
-                            DependentVariable dv;
-                            if (sd.Database.GetDepVars().TryGetValue(((IndependentVariable)token).Name, out dv))
-                            {
-                                stmtOutput[i] = dv;
-                            }
-                        }
-                    }
-                    output.AddRange(stmtOutput);
+                    output.AddRange(stmt.Output);
                 }
                 return output;
             }
@@ -99,7 +92,6 @@ namespace VisiBoole.ParsingEngine
                 List<Statement> stmtList = ParseStatements(sd, true, false);
                 foreach (Statement stmt in stmtList)
                 {
-
                     if (stmt.GetType() == typeof(DffClockStmt))
                     {
                         stmt.Parse();
