@@ -28,6 +28,7 @@ using VisiBoole.ErrorHandling;
 using VisiBoole.Models;
 using VisiBoole.ParsingEngine.ObjectCode;
 using VisiBoole.ParsingEngine.Statements;
+using VisiBoole.Views;
 
 namespace VisiBoole.ParsingEngine
 {
@@ -180,7 +181,7 @@ namespace VisiBoole.ParsingEngine
                     if (CommentStmt.Regex.Match(line).Success)
                     {
                         Match match = CommentStmt.Regex.Match(line);
-                        if (match.Groups["DoInclude"].Value.Equals("+"))
+                        if (Properties.Settings.Default.SimulationComments || match.Groups["DoInclude"].Value.Equals("+"))
                         {
                             expandedSourceCode += String.Concat(match.Groups["Spacing"].Value, match.Groups["Comment"].Value, "\n");
                             continue;
@@ -194,7 +195,7 @@ namespace VisiBoole.ParsingEngine
                     // Check for ;
                     if (!line.Contains(";"))
                     {
-                        MessageBox.Show("Missing ';'. Line: " + lineNum, "Syntax Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Globals.Dialog.New("Syntax Error", "On line " + lineNum + ", ';' is missing.", DialogType.Ok);
                         return null;
                     }
 
@@ -218,14 +219,14 @@ namespace VisiBoole.ParsingEngine
                             }
                             else
                             {
-                                MessageBox.Show("Unmatching '" + c + "'. Line: " + lineNum, "Syntax Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                Globals.Dialog.New("Syntax Error", "On line " + lineNum + ", unmatching '" + c + "'.", DialogType.Ok);
                                 return null;
                             }
                         }
                     }
                     if (stack.Count > 0)
                     {
-                        MessageBox.Show("Unmatching '" + stack.Peek() + "'. Line: " + lineNum, "Syntax Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Globals.Dialog.New("Syntax Error", "On line " + lineNum + ", unmatching '" + stack.Peek() + "'.", DialogType.Ok);
                         return null;
                     }
 
@@ -234,7 +235,7 @@ namespace VisiBoole.ParsingEngine
                     {
                         if (line.Contains("*"))
                         {
-                            MessageBox.Show("You cannot use a '*' with a variable in an assignment statement. Line: " + lineNum, "Syntax Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            Globals.Dialog.New("Syntax Error", "On line " + lineNum + ", you cannot use a '*' with a variable in an assignment statement.", DialogType.Ok);
                             return null;
                         }
 
@@ -262,7 +263,7 @@ namespace VisiBoole.ParsingEngine
                         }
                         else
                         {
-                            MessageBox.Show("Vector and/or Concatenation element counts must be consistent across entire expression. Line: " + lineNum, "Syntax Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            Globals.Dialog.New("Syntax Error", "On line " + lineNum + ", vector and/or concatenation element counts must be consistent across the entire expression.", DialogType.Ok);
                             return null;
                         }
                     }

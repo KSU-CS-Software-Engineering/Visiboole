@@ -239,12 +239,12 @@ namespace VisiBoole.Views
        {
            if (fileSaved == true)
            {
-               MessageBox.Show("File save successful.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+               Globals.Dialog.New("Success", "File save successful.", DialogType.Ok);
            }
            else
            {
-               MessageBox.Show("File save failed.", "Failure", MessageBoxButtons.OK, MessageBoxIcon.Error);
-           }
+                Globals.Dialog.New("Failure", "File save failed.", DialogType.Ok);
+            }
        }
 
        /// <summary>
@@ -257,7 +257,7 @@ namespace VisiBoole.Views
            if (isDirty == true)
            {
                System.Media.SystemSounds.Asterisk.Play();
-               DialogResult response = MessageBox.Show("You have made changes to the file you are trying to close - do you wish to continue?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1);
+               DialogResult response = Globals.Dialog.New("Confirm", "You have made changes to the file you are trying to close - do you wish to continue?", DialogType.YesNo);
 
                if (response == DialogResult.Yes) return true;
                else return false;
@@ -275,7 +275,7 @@ namespace VisiBoole.Views
            if (isDirty == true)
            {
                System.Media.SystemSounds.Asterisk.Play();
-               DialogResult response = MessageBox.Show("You have made changes that have not been saved - do you wish to continue?", "Confirm", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1);
+               DialogResult response = Globals.Dialog.New("Confirm", "You have made changes that have not been saved - do you wish to continue?", DialogType.YesNo);
 
                if (response == DialogResult.Yes)
                {
