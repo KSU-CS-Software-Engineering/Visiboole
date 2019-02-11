@@ -21,6 +21,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
@@ -243,14 +244,29 @@ namespace VisiBoole.ParsingEngine
 
                         if (expansion != null)
                         {
-                            /*
+                            /* Commented out for now
                             MatchCollection matches = Regex.Matches(line, Globals.PatternAnyVectorType);
                             foreach (Match match in matches)
                             {
-                                if (!sd.Database.AddVectorNamespace(match.Groups["Name"].Value, ExpandHorizontally(match)))
+                                string vectorName = match.Groups["Name"].Value;
+                                string expanded = ExpandHorizontally(match);
+
+                                if (sd.Database.HasVectorNamespace(vectorName))
                                 {
-                                    MessageBox.Show("Vector Namespace " + match.Groups["Name"].Value + " already exists. Line: " + lineNum, "Syntax Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                    return null;
+                                    List<string> expandedComponents = expanded.Split().ToList();
+                                    List<string> vectorComponents = sd.Database.GetVectorComponents(vectorName);
+                                    int intersectCount = vectorComponents.Intersect(expandedComponents).Count();
+
+                                    if (!(intersectCount > 0 && intersectCount == expandedComponents.Count()))
+                                    {
+                                        // Display error if the referenced components aren't a subset of the components in the database
+                                        Globals.Dialog.New("Syntax Error", "On line " + lineNum + ", vector namespace " + vectorName + " is already defined. Only the following components: " + String.Join(" ", vectorComponents) + " can be referenced.", DialogType.Ok);
+                                        return null;
+                                    }
+                                }
+                                else
+                                {
+                                    sd.Database.AddVectorNamespace(vectorName, expanded);
                                 }
                             }
                             */
@@ -273,16 +289,30 @@ namespace VisiBoole.ParsingEngine
                         while (RegexExpansion.IsMatch(output))
                         {
                             Match match = RegexExpansion.Matches(output)[0]; // Get match
+                            string vectorName = match.Groups["Name"].Value;
                             string expanded = ExpandHorizontally(match);
-                            output = output.Substring(0, match.Index) + expanded + output.Substring(match.Index + match.Length);
-                            sd.Database.AddVectorNamespace(match.Groups["Name"].Value, expanded);
-                            /*
-                            if (!sd.Database.AddVectorNamespace(match.Groups["Name"].Value, expanded))
+
+                            /* Commented out for now
+                            if (sd.Database.HasVectorNamespace(vectorName))
                             {
-                                MessageBox.Show("Vector Namespace " + match.Groups["Name"].Value + " already exists. Line: " + lineNum, "Syntax Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                                return null;
+                                List<string> expandedComponents = expanded.Split().ToList();
+                                List<string> vectorComponents = sd.Database.GetVectorComponents(vectorName);
+                                int intersectCount = vectorComponents.Intersect(expandedComponents).Count();
+
+                                if (!(intersectCount > 0 && intersectCount == expandedComponents.Count()))
+                                {
+                                    // Display error if the referenced components aren't a subset of the components in the database
+                                    Globals.Dialog.New("Syntax Error", "On line " + lineNum + ", vector namespace " + vectorName + " is already defined. Only the following components: " + String.Join(" ", vectorComponents) + " can be referenced.", DialogType.Ok);
+                                    return null;
+                                }
+                            }
+                            else
+                            {
+                                sd.Database.AddVectorNamespace(vectorName, expanded);
                             }
                             */
+
+                            output = output.Substring(0, match.Index) + expanded + output.Substring(match.Index + match.Length);
                         }
 
                         if (init && !InitVariables(sd, output))

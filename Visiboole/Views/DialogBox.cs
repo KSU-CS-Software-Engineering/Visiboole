@@ -57,7 +57,7 @@ namespace VisiBoole.Views
         /// <returns></returns>
         public DialogResult New(string title, string message, DialogType type)
         {
-            this.uxPanelTop.BackColor = Globals.Theme.Equals("light") ? Color.DodgerBlue : Color.FromArgb(66, 66, 66);
+            this.uxPanelTop.BackColor = Properties.Settings.Default.Theme.Equals("Light") ? Color.DodgerBlue : Color.FromArgb(66, 66, 66);
             this.uxLabelTitle.Text = title;
             this.uxLabelMessage.Text = message;
             this.uxButton1.Select();
@@ -89,7 +89,8 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void DialogBoxPaint(object sender, PaintEventArgs e)
         {
-            e.Graphics.DrawRectangle(new Pen(Color.Black, 2), this.DisplayRectangle);
+            Color color = Properties.Settings.Default.Theme.Equals("Light") ? Color.DodgerBlue : Color.FromArgb(66, 66, 66);
+            e.Graphics.DrawRectangle(new Pen(color, 4), this.DisplayRectangle);
         }
     }
 }

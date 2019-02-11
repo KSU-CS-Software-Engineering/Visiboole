@@ -60,21 +60,6 @@ namespace VisiBoole
         public static TabControl TabControl = null;
 
         /// <summary>
-        /// Theme
-        /// </summary>
-        public static string Theme = Properties.Settings.Default.Theme;
-
-        /// <summary>
-        /// Font size
-        /// </summary>
-        public static float FontSize = Properties.Settings.Default.FontSize;
-
-        /// <summary>
-        /// Whether Color Blind mode is toggled
-        /// </summary>
-        public static bool ColorBlind = Properties.Settings.Default.Colorblind;
-
-        /// <summary>
         /// Regular Expression Patterns for Variables
         /// </summary>
         public static readonly string PatternVariable = @"(\*?[a-zA-Z0-9]+)";
