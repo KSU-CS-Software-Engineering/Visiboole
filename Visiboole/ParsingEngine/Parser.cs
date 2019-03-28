@@ -816,8 +816,15 @@ namespace VisiBoole.ParsingEngine
                             // Find design (First look in current design directory, then libraries)
                             try
                             {
+                                bool foundDecleration = false;
                                 string[] files = Directory.GetFiles(Design.FileSource.DirectoryName, String.Concat(designName, ".vbi"));
-                                if (files.Length == 0)
+                                if (files.Length > 0)
+                                {
+                                    // Check for module decleration
+                                    foundDecleration = DesignHasModuleDecleration(files[0]);
+                                }
+
+                                if (!foundDecleration)
                                 {
                                     // Move this
                                     for (int i = 0; i < Libraries.Count; i++)
@@ -826,20 +833,20 @@ namespace VisiBoole.ParsingEngine
                                         if (files.Length > 0)
                                         {
                                             // Check for module decleration
-                                            break;
+                                            foundDecleration = DesignHasModuleDecleration(files[0]);
+                                            if (foundDecleration)
+                                            {
+                                                break;
+                                            }
                                         }
                                     }
 
-                                    if (files.Length == 0)
+                                    if (!foundDecleration)
                                     {
                                         // Not found
                                         Globals.Logger.Add($"Line {PreLineNumber}: Unable to find '{designName}'.");
                                         return null;
                                     }
-                                }
-                                else
-                                {
-                                    // Check for module decleration
                                 }
 
                                 // At this point, the design was found
@@ -1129,6 +1136,30 @@ namespace VisiBoole.ParsingEngine
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Returns whether the design contains a module decleration.
+        /// </summary>
+        /// <param name="path">Path of the design</param>
+        /// <returns>Whether the design contains a module decleration</returns>
+        private bool DesignHasModuleDecleration(string path)
+        {
+            FileInfo fileInfo = new FileInfo(path);
+            string name = fileInfo.Name.Split('.')[0];
+            using (StreamReader reader = fileInfo.OpenText())
+            {
+                string nextLine = string.Empty;
+                while ((nextLine = reader.ReadLine()) != null)
+                {
+                    if (Regex.IsMatch(nextLine, $@"{name}\(.+\);"))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         /// <summary>
