@@ -47,7 +47,7 @@ namespace VisiBoole.ParsingEngine.Boolean
 
             // Obtain scalars, constants and operators
             expression = $"({expression})"; // Add () to expression
-            MatchCollection matches = Regex.Matches(expression, @"(~?(?<Name>[_a-zA-Z]\w{0,19}))|(~?'[bB][0-1])|([~^()|+-])|(==)|(?<=\w|\))\s(?=[\w(~'])");
+            MatchCollection matches = Regex.Matches(expression, $@"{Parser.ConcatenationPattern}|(~?(?<Name>[_a-zA-Z]\w{{0,19}}))|(~?'[bB][0-1])|([~^()|+-])|(==)|((?<=[\w)}}])\s+(?=[\w({{~'])(?![^{{}}]*\}}))");
             foreach (Match match in matches)
             {
                 if (match.Value == ")")
@@ -83,29 +83,44 @@ namespace VisiBoole.ParsingEngine.Boolean
                 }
                 else
                 {
-                    // Process var
-                    string var = match.Value;
+                    // Process variable
+                    string variable = match.Value;
                     int value = 0;
                     bool containsNot = false;
 
-                    if (var[0] == '~')
+                    if (variable.Contains("{"))
                     {
-                        containsNot = true;
-                        var = var.Substring(1);
-                    }
-                    
-                    if (var.Contains("'"))
-                    {
-                        value = Convert.ToInt32(var[2].ToString());
+                        variable = variable.Substring(1, variable.Length - 2);
+                        string[] vars = Regex.Split(variable, @"\s+");
+
+                        List<int> bits = new List<int>();
+
+                        foreach (string var in vars)
+                        {
+                            bits.Add(Convert.ToInt32(Parser.ScalarRegex1.Match(var).Groups["Bit"].Value));
+                        }
                     }
                     else
                     {
-                        value = database.TryGetValue(var);
-                    }
+                        if (variable[0] == '~')
+                        {
+                            containsNot = true;
+                            variable = variable.Substring(1);
+                        }
 
-                    if (containsNot)
-                    {
-                        value = Convert.ToInt32(!Convert.ToBoolean(value));
+                        if (variable.Contains("'"))
+                        {
+                            value = Convert.ToInt32(variable[2].ToString());
+                        }
+                        else
+                        {
+                            value = database.TryGetValue(variable);
+                        }
+
+                        if (containsNot)
+                        {
+                            value = Convert.ToInt32(!Convert.ToBoolean(value));
+                        }
                     }
 
                     valueStack.Push(value);
