@@ -93,12 +93,13 @@ namespace VisiBoole.ParsingEngine.Boolean
                         variable = variable.Substring(1, variable.Length - 2);
                         string[] vars = Regex.Split(variable, @"\s+");
 
-                        List<int> bits = new List<int>();
-
+                        // Get binary value
+                        StringBuilder binary = new StringBuilder();
                         foreach (string var in vars)
                         {
-                            bits.Add(Convert.ToInt32(Parser.ScalarRegex1.Match(var).Groups["Bit"].Value));
+                            binary.Append(database.TryGetValue(Parser.ScalarRegex1.Match(var).Value));
                         }
+                        value = Convert.ToInt32(binary.ToString(), 2);
                     }
                     else
                     {
@@ -110,7 +111,23 @@ namespace VisiBoole.ParsingEngine.Boolean
 
                         if (variable.Contains("'"))
                         {
-                            value = Convert.ToInt32(variable[2].ToString());
+                            Match constant = Parser.ConstantRegex.Match(variable);
+
+                            // Get binary bits from format type
+                            string outputBinary;
+                            if (constant.Groups["Format"].Value == "h" || constant.Groups["Format"].Value == "H")
+                            {
+                                outputBinary = Convert.ToString(Convert.ToInt32(constant.Groups["Value"].Value, 16), 2);
+                            }
+                            else if (constant.Groups["Format"].Value == "d" || constant.Groups["Format"].Value == "D")
+                            {
+                                outputBinary = Convert.ToString(Convert.ToInt32(constant.Groups["Value"].Value, 10), 2);
+                            }
+                            else
+                            {
+                                outputBinary = constant.Groups["Value"].Value;
+                            }
+                            value = Convert.ToInt32(outputBinary, 2);
                         }
                         else
                         {
@@ -156,6 +173,12 @@ namespace VisiBoole.ParsingEngine.Boolean
                     break;
                 case "==":
                     result = Convert.ToInt32(Convert.ToBoolean(leftValue) == Convert.ToBoolean(rightValue));
+                    break;
+                case "+":
+                    result = leftValue + rightValue;
+                    break;
+                case "-":
+                    result = leftValue - rightValue;
                     break;
             }
 
