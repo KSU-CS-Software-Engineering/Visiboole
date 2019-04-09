@@ -285,32 +285,8 @@ namespace VisiBoole.Controllers
         /// <param name="instantiation">The instantiation that was clicked by the user</param>
         public void Instantiation_Click(string instantiation)
         {
-            // Decode path
-            /*
-            designPath = designPath.Replace("&amp;", "&").Replace("&back;", "\\").Replace("&apos;", "'");
-
-            Design design = new Design(designPath, delegate { });
-
-            Design current = mwController.GetActiveDesign();
-            List<Variable> inputs = new List<Variable>(); // Add inputs here
-            Parser parser = new Parser();
-            List<IObjectCodeElement> output = parser.ParseWithInput(design, inputs);
-            if (output == null)
-            {
-                return;
-            }
-
-            HtmlBuilder html = new HtmlBuilder(design, output);
-            if (html.HtmlText == null)
-            {
-                return;
-            }
-            string htmlOutput = html.GetHTML();
-            */
-
-
-            /*
-            HtmlBuilder html = new HtmlBuilder(design, output);
+            List<IObjectCodeElement> output = mwController.RunSubdesign(instantiation);
+            HtmlBuilder html = new HtmlBuilder(output);
             if (html.HtmlText == null)
             {
                 return;
@@ -318,16 +294,14 @@ namespace VisiBoole.Controllers
             string htmlOutput = html.GetHTML();
 
             browser.ObjectForScripting = this;
-            int position = browser.Document.Body.ScrollTop;
             html.DisplayHtml(htmlOutput, browser);
 
-            browser.DocumentCompleted += (sender, e) => { browser.Document.Body.ScrollTop = position; };
+            browser.DocumentCompleted += (sender, e) => {
+                browser.Document.Body.Click += (sender2, e2) => { mwController.RetrieveFocus(); };
+                mwController.RetrieveFocus();
+            };
 
-            if (CurrentDisplay is DisplayEdit)
-            {
-                mwController.LoadDisplay(DisplayType.RUN);
-            }
-            */
+            CurrentDisplay.AddNewOutput(instantiation.Split('.')[0], browser);
         }
 
         /// <summary>

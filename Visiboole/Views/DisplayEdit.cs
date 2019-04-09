@@ -81,7 +81,11 @@ namespace VisiBoole.Views
 		/// <param name="browser">The browser that will be loaded by this display</param>
 		public void LoadWebBrowser(WebBrowser browser)
 		{
-
 		}
-	}
+
+        public void AddNewOutput(string name, WebBrowser browser)
+        {
+        }
+
+    }
 }

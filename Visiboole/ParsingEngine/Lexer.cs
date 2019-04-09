@@ -82,7 +82,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Pattern for identifying submodule instantiation notation.
         /// </summary>
-        protected static readonly string InstantiationNotationPattern = @"(?<Design>\w+)\.(?<Name>\w+)";
+        public static readonly string InstantiationNotationPattern = @"(?<Design>\w+)\.(?<Name>\w+)";
 
         /// <summary>
         /// Pattern for identifying submodule instantiations.
@@ -164,12 +164,12 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Dictionary of submodules for this instance.
         /// </summary>
-        protected Dictionary<string, string> Subdesigns;
+        public Dictionary<string, string> Subdesigns;
 
         /// <summary>
         /// Dictionary of instantiations for this instance.
         /// </summary>
-        protected Dictionary<string, string> Instantiations;
+        public Dictionary<string, string> Instantiations;
 
         /// <summary>
         /// Memo for vector expansions.
@@ -683,6 +683,7 @@ namespace VisiBoole.ParsingEngine
                     else
                     {
                         Instantiations.Add(instantiationName, line);  // Come back
+                        Subdesigns.Add(designName, @"U:\cis642\Visiboole\Resources\Sample Files\ormodule.vbi");
                     }
 
                     type = StatementType.Submodule;

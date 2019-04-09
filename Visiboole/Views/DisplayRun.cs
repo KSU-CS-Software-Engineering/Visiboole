@@ -92,6 +92,14 @@ namespace VisiBoole.Views
             }
 		}
 
+        public void AddNewOutput(string name, WebBrowser browser)
+        {
+            TabPage newTab = new TabPage(name);
+            newTab.Controls.Add(browser);
+            BrowserTabControl.TabPages.Add(newTab);
+            BrowserTabControl.SelectedTab = newTab;
+        }
+
         /// <summary>
         /// Handles the event when the tick button is clicked
         /// </summary>
