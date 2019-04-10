@@ -682,8 +682,57 @@ namespace VisiBoole.ParsingEngine
                     }
                     else
                     {
-                        Instantiations.Add(instantiationName, line);  // Come back
-                        Subdesigns.Add(designName, @"U:\cis642\Visiboole\Resources\Sample Files\ormodule.vbi");
+                        try
+                        {
+                            if (!Subdesigns.ContainsKey(designName))
+                            {
+                                string file = null;
+                                string[] files = Directory.GetFiles(Design.FileSource.DirectoryName, String.Concat(designName, ".vbi"));
+                                if (files.Length > 0)
+                                {
+                                    // Check for module Declaration
+                                    //foundDeclaration = DesignHasModuleDeclaration(files[0], line);
+                                    file = files[0];
+                                }
+
+                                if (file != null)
+                                {
+                                    for (int i = 0; i < Libraries.Count; i++)
+                                    {
+                                        files = Directory.GetFiles(Libraries[i], String.Concat(designName, ".vbi"));
+                                        if (files.Length > 0)
+                                        {
+                                            // Check for module Declaration
+                                            //foundDeclaration = DesignHasModuleDeclaration(files[0], line);
+                                            file = files[0];
+                                            if (file != null)
+                                            {
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if (file == null)
+                                    {
+                                        // Not found
+                                        Globals.Logger.Add($"Line {LineNumber}: Unable to find '{designName}'.");
+                                        return false;
+                                    }
+                                }
+
+                                Subdesigns.Add(designName, file);
+                                Instantiations.Add(instantiationName, line);
+                            }
+                            else
+                            {
+                                Instantiations.Add(instantiationName, line);
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            Globals.Logger.Add($"Line {LineNumber}: Error locating '{designName}'.");
+                            return false;
+                        }
                     }
 
                     type = StatementType.Submodule;

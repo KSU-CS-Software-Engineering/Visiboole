@@ -69,6 +69,11 @@ namespace VisiBoole.Controllers
 		public WebBrowser browser;
 
         /// <summary>
+        /// Empty browser.
+        /// </summary>
+        private WebBrowser BrowserTemplate;
+
+        /// <summary>
         /// Last output of the browser.
         /// </summary>
         private List<IObjectCodeElement> LastOutput;
@@ -94,8 +99,9 @@ namespace VisiBoole.Controllers
 			}
 			set
 			{
-				value.LoadTabControl(tabControl);
-				value.LoadWebBrowser(browser);
+				value.AddTabControl(tabControl);
+                string currentDesign = tabControl.SelectedTab != null ? tabControl.SelectedTab.Name.TrimStart('*') : "";
+				value.AddBrowser(currentDesign, browser);
 				currentDisplay = value;
 			}
 		}
@@ -133,12 +139,13 @@ namespace VisiBoole.Controllers
             browser.IsWebBrowserContextMenuEnabled = false;
             browser.AllowWebBrowserDrop = false;
             browser.WebBrowserShortcutsEnabled = false;
+            BrowserTemplate = browser;
 
             ImageList il = new ImageList();
             il.Images.Add("Close", VisiBoole.Properties.Resources.Close);
             tabControl.ImageList = il;
 
-			this.edit = edit;
+            this.edit = edit;
 			this.run = run;
 
 			allDisplays = new Dictionary<DisplayType, IDisplay>();
@@ -253,6 +260,14 @@ namespace VisiBoole.Controllers
         }
 
         /// <summary>
+        /// Switches the display to the edit mode.
+        /// </summary>
+        public void SwitchDisplay()
+        {
+            mwController.LoadDisplay(DisplayType.EDIT);
+        }
+
+        /// <summary>
         /// Handles the event that occurs when the user ticks.
         /// </summary>
         /// <param name="count">Number of times to tick</param>
@@ -293,15 +308,19 @@ namespace VisiBoole.Controllers
             }
             string htmlOutput = html.GetHTML();
 
-            browser.ObjectForScripting = this;
-            html.DisplayHtml(htmlOutput, browser);
+            WebBrowser subBrowser = new WebBrowser();
+            subBrowser.IsWebBrowserContextMenuEnabled = false;
+            subBrowser.AllowWebBrowserDrop = false;
+            subBrowser.WebBrowserShortcutsEnabled = false;
+            subBrowser.ObjectForScripting = this;
+            html.DisplayHtml(htmlOutput, subBrowser);
 
-            browser.DocumentCompleted += (sender, e) => {
-                browser.Document.Body.Click += (sender2, e2) => { mwController.RetrieveFocus(); };
+            subBrowser.DocumentCompleted += (sender, e) => {
+                subBrowser.Document.Body.Click += (sender2, e2) => { mwController.RetrieveFocus(); };
                 mwController.RetrieveFocus();
             };
 
-            CurrentDisplay.AddNewOutput(instantiation.Split('.')[0], browser);
+            CurrentDisplay.AddBrowser(instantiation.Split('.')[0], subBrowser);
         }
 
         /// <summary>
