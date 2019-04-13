@@ -138,11 +138,6 @@ namespace VisiBoole.ParsingEngine
         protected List<string> ErrorLog;
 
         /// <summary>
-        /// Error dialog box for design errors.
-        /// </summary>
-        protected ErrorDialogBox ErrorDialogBox;
-
-        /// <summary>
         /// The design being parsed.
         /// </summary>
         protected Design Design;
@@ -174,7 +169,6 @@ namespace VisiBoole.ParsingEngine
         protected Lexer(Design design)
         {
             ErrorLog = new List<string>();
-            ErrorDialogBox = new ErrorDialogBox();
             Design = design;
             Libraries = new List<string>();
             Subdesigns = new Dictionary<string, string>();

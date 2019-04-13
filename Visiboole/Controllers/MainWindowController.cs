@@ -25,6 +25,7 @@ using System.IO;
 using VisiBoole.Models;
 using System.Windows.Forms;
 using VisiBoole.ParsingEngine.ObjectCode;
+using CustomTabControl;
 
 namespace VisiBoole.Controllers
 {
@@ -49,11 +50,6 @@ namespace VisiBoole.Controllers
         private IDesignController DesignController;
 
         /// <summary>
-        /// Dialog box for user prompts.
-        /// </summary>
-        private DialogBox DialogBox;
-
-        /// <summary>
         /// Constructs an instance of MainWindowController with handles to its view and the controllers
         /// </summary>
         /// <param name="mainWindow">Handle to the MainWindow which is the view for this controller</param>
@@ -65,7 +61,6 @@ namespace VisiBoole.Controllers
 			MainWindow.AttachMainWindowController(this);
 			DisplayController = displayController;
             DesignController = designController;
-            DialogBox = new DialogBox();
         }
 
         /// <summary>
@@ -151,15 +146,8 @@ namespace VisiBoole.Controllers
         /// <param name="index">The index of the file</param>
         public void SelectFile(int index)
         {
-            try
-            {
-                string designName = DisplayController.SelectTabPage(index);
-                DesignController.SelectDesign(designName);
-            }
-            catch (Exception)
-            {
-                //DialogBox.New("Error", "An unexpected error has occured while selecting a tab page.", DialogType.Ok);
-            }
+            string designName = DisplayController.SelectTabPage(index);
+            DesignController.SelectDesign(designName);
         }
 
         /// <summary>
@@ -169,26 +157,18 @@ namespace VisiBoole.Controllers
 		/// <param name="overwriteExisting">True if the file at the given path should be overwritten</param>
 		public void ProcessNewFile(string path, bool overwriteExisting = false)
         {
-            try
+            if (overwriteExisting == true && File.Exists(path))
             {
-                if (overwriteExisting == true && File.Exists(path))
-                {
-                    File.Delete(path);
-                }
-
-                Design design = DesignController.CreateDesign(path);
-
-                if (DisplayController.CreateNewTab(design) == true)
-                {
-                    MainWindow.AddNavTreeNode(design.FileName);
-                }
-
-                LoadDisplay(DisplayController.CurrentDisplay.TypeOfDisplay);
+                File.Delete(path);
             }
-            catch (Exception)
+
+            Design design = DesignController.CreateDesign(path);
+            if (DisplayController.CreateNewTab(design) == true)
             {
-                DialogBox.New("Error", "An unexpected error has occured while processing a new file.", DialogType.Ok);
+                MainWindow.AddNavTreeNode(design.FileName);
             }
+
+            LoadDisplay(DisplayController.CurrentDisplay.TypeOfDisplay);
         }
 
         /// <summary>
@@ -196,14 +176,7 @@ namespace VisiBoole.Controllers
         /// </summary>
         public void SaveFile()
         {
-            try
-            {
-                SaveFileSuccess(DesignController.SaveActiveDesign());
-            }
-            catch (Exception)
-            {
-                DialogBox.New("Error", "An unexpected error has occured while saving a file.", DialogType.Ok);
-            }
+            SaveFileSuccess(DesignController.SaveActiveDesign());
         }
 
         /// <summary>
@@ -212,21 +185,13 @@ namespace VisiBoole.Controllers
         /// <param name="path">The new file path to save the active file to</param>
         public void SaveFileAs(string path)
         {
-            try
-            {
-                // Write the contents of the active tab in a new file at location of the selected path
-                string content = DisplayController.GetActiveTabPage().Design().Text;
-                File.WriteAllText(Path.ChangeExtension(path, ".vbi"), content);
+            // Write the contents of the active tab in a new file at location of the selected path
+            string content = DisplayController.GetActiveTabPage().Design().Text;
+            File.WriteAllText(Path.ChangeExtension(path, ".vbi"), content);
 
-                // Process the new file as usual
-                ProcessNewFile(path);
-                SaveFileSuccess(true);
-            }
-            catch (Exception)
-            {
-                SaveFileSuccess(false);
-                DialogBox.New("Error", "An unexpected error has occured during a save as file operation.", DialogType.Ok);
-            }
+            // Process the new file as usual
+            ProcessNewFile(path);
+            SaveFileSuccess(true);
         }
 
         /// <summary>
@@ -234,14 +199,7 @@ namespace VisiBoole.Controllers
         /// </summary>
         public void SaveFiles()
         {
-            try
-            {
-                SaveFileSuccess(DesignController.SaveDesigns());
-            }
-            catch (Exception)
-            {
-                DialogBox.New("Error", "An unexpected error has occured while saving all files.", DialogType.Ok);
-            }
+            SaveFileSuccess(DesignController.SaveDesigns());
         }
 
         /// <summary>
@@ -274,7 +232,7 @@ namespace VisiBoole.Controllers
                 DisplayController.CloseTab(design.TabPageIndex);
                 DesignController.CloseDesign(name, save);
                 MainWindow.RemoveNavTreeNode(design.FileName);
-                return design.FileSourceName;
+                return design.FileName;
             }
             else
             {
@@ -287,14 +245,7 @@ namespace VisiBoole.Controllers
         /// </summary>
         public void CloseActiveFile()
         {
-            try
-            {
-                CloseFile(Controllers.DesignController.ActiveDesign.FileName);
-            }
-            catch (Exception)
-            {
-                DialogBox.New("Error", "An unexpected error has occured while closing a file.", DialogType.Ok);
-            }
+            CloseFile(Controllers.DesignController.ActiveDesign.FileName);
         }
 
         /// <summary>
@@ -302,22 +253,15 @@ namespace VisiBoole.Controllers
         /// </summary>
         public void CloseFiles()
         {
-            try
-            {
-                string[] files = DesignController.GetDesigns();
+            string[] files = DesignController.GetDesigns();
 
-                // Try to close all files
-                for (int i = 0; i < files.Length; i++)
-                {
-                    if (CloseFile(files[i]) == null)
-                    {
-                        return; // File wasn't closed
-                    }
-                }
-            }
-            catch (Exception)
+            // Try to close all files
+            for (int i = 0; i < files.Length; i++)
             {
-                DialogBox.New("Error", "An unexpected error has occured while closing all files.", DialogType.Ok);
+                if (CloseFile(files[i]) == null)
+                {
+                    return; // File wasn't closed
+                }
             }
         }
 
@@ -327,25 +271,40 @@ namespace VisiBoole.Controllers
         /// <param name="name">Name of the file to keep open</param>
         public void CloseFilesExceptFor(string name)
         {
-            try
-            {
-                string[] files = DesignController.GetDesigns();
+            string[] files = DesignController.GetDesigns();
 
-                for (int i = 0; i < files.Length; i++)
+            for (int i = 0; i < files.Length; i++)
+            {
+                if (!files[i].Equals(name))
                 {
-                    if (!files[i].Equals(name))
+                    if (CloseFile(files[i]) == null)
                     {
-                        if (CloseFile(files[i]) == null)
-                        {
-                            return; // File wasn't closed
-                        }
+                        return; // File wasn't closed
                     }
                 }
             }
-            catch (Exception)
-            {
-                DialogBox.New("Error", "An unexpected error has occured while closing all files.", DialogType.Ok);
-            }
+        }
+
+        /// <summary>
+        /// Handles the event that occurs when an edit has been made to a design.
+        /// </summary>
+        /// <param name="sender">Design being edited</param>
+        /// <param name="eventArgs">Arguments of the edit</param>
+        public void OnDesignEdit(object sender, DesignEditEventArgs eventArgs)
+        {
+            DisplayController.UpdateTabText(((Design)sender).FileName, eventArgs.IsDirty);
+            MainWindow.UpdateControls(DisplayController.CurrentDisplay, eventArgs);
+        }
+
+        /// <summary>
+        /// Handles the event that occurs when two designs are being swapped on the tab control.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="eventArgs"></param>
+        public void SwapDesigns(object sender, TabSwapEventArgs eventArgs)
+        {
+            MainWindow.SwapNavTreeNodes(eventArgs.SourceTabPageIndex, eventArgs.DestinationTabPageIndex);
+            DesignController.SwapDesignTabIndexes(sender, eventArgs);
         }
 
         /// <summary>
@@ -353,6 +312,7 @@ namespace VisiBoole.Controllers
         /// </summary>
         public void SetTheme()
         {
+            DisplayController.SetTheme();
             DesignController.SetThemes();
         }
 

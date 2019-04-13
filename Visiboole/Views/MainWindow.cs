@@ -25,6 +25,7 @@ using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 using VisiBoole.Controllers;
+using VisiBoole.Models;
 
 namespace VisiBoole.Views
 {
@@ -68,38 +69,38 @@ namespace VisiBoole.Views
         /// Update buttons and icons based on the display
         /// </summary>
         /// <param name="current"></param>
-        public void UpdateControls(IDisplay display)
+        public void UpdateControls(IDisplay display, DesignEditEventArgs eventArgs = null)
         {
             openIcon.Enabled = (display.TypeOfDisplay == DisplayType.EDIT);
-            openToolStripMenuItem.Enabled = openIcon.Enabled;
-            newIcon.Enabled = openIcon.Enabled;
-            newToolStripMenuItem.Enabled = openIcon.Enabled;
+            openToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT);
+            newIcon.Enabled = (display.TypeOfDisplay == DisplayType.EDIT);
+            newToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT);
             saveIcon.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
-            saveAllIcon.Enabled = saveIcon.Enabled;
-            saveToolStripMenuItem.Enabled = saveIcon.Enabled;
-            saveAsToolStripMenuItem.Enabled = saveIcon.Enabled;
-            runModeToggle.Enabled = saveIcon.Enabled;
-            newStateToolStripMenuItem.Enabled = saveIcon.Enabled;
+            saveAllIcon.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
+            saveToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
+            saveAsToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
+            runModeToggle.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
+            newStateToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
             editModeToggle.Enabled = (display.TypeOfDisplay == DisplayType.RUN);
-            closeDesignToolStripMenuItem.Enabled = saveIcon.Enabled;
-            closeAllDesignToolStripMenuItem.Enabled = saveIcon.Enabled;
+            closeDesignToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
+            closeAllDesignToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
             increaseFontToolStripMenuItem.Enabled = (NavTree.Nodes[0].Nodes.Count > 0);
-            decreaseFontToolStripMenuItem.Enabled = decreaseFontToolStripMenuItem.Enabled;
-            selectAllToolStripMenuItem.Enabled = saveIcon.Enabled;
+            decreaseFontToolStripMenuItem.Enabled = (NavTree.Nodes[0].Nodes.Count > 0);
+            selectAllToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
 
             if (NavTree.Nodes[0].Nodes.Count > 0)
             {
                 MainWindowController.SetFontSize();
             }
 
-            if (display.TypeOfDisplay == DisplayType.EDIT && DesignController.ActiveDesign != null)
+            if (display.TypeOfDisplay == DisplayType.EDIT && eventArgs != null)
             {
-                undoToolStripMenuItem.Enabled = DesignController.ActiveDesign.EditHistory.Count > 0;
-                undoToolStripMenuItem1.Enabled = DesignController.ActiveDesign.EditHistory.Count > 0;
-                redoToolStripMenuItem.Enabled = DesignController.ActiveDesign.UndoHistory.Count > 0;
-                redoToolStripMenuItem1.Enabled = DesignController.ActiveDesign.UndoHistory.Count > 0;
-                cutToolStripMenuItem.Enabled = DesignController.ActiveDesign.SelectedText.Length > 0;
-                copyToolStripMenuItem.Enabled = DesignController.ActiveDesign.SelectedText.Length > 0;
+                undoToolStripMenuItem.Enabled = eventArgs.EditHistory.Count > 0;
+                undoToolStripMenuItem1.Enabled = eventArgs.EditHistory.Count > 0;
+                redoToolStripMenuItem.Enabled = eventArgs.UndoHistory.Count > 0;
+                redoToolStripMenuItem1.Enabled = eventArgs.UndoHistory.Count > 0;
+                cutToolStripMenuItem.Enabled = eventArgs.SelectedText;
+                copyToolStripMenuItem.Enabled = eventArgs.SelectedText;
                 pasteToolStripMenuItem.Enabled = Clipboard.ContainsText();
             }
             else
@@ -133,13 +134,6 @@ namespace VisiBoole.Views
                 OpenFileLinkLabel.LinkColor = Color.DodgerBlue;
 
                 MainWindowController.SetTheme();
-
-                // Set tab control colors
-                Globals.TabControl.BackgroundColor = Color.AliceBlue;
-                Globals.TabControl.TabColor = Color.White;
-                Globals.TabControl.TabTextColor = Color.Black;
-                Globals.TabControl.TabPages.Add("!@#$FillTab!@#$");
-                Globals.TabControl.TabPages.Remove(Globals.TabControl.TabPages[Globals.TabControl.TabPages.Count - 1]);
             }
             else
             {
@@ -154,12 +148,6 @@ namespace VisiBoole.Views
                 OpenFileLinkLabel.LinkColor = Color.DodgerBlue;
 
                 MainWindowController.SetTheme();
-
-                Globals.TabControl.BackgroundColor = Color.FromArgb(66, 66, 66);
-                Globals.TabControl.TabColor = Color.FromArgb(66, 66, 66);
-                Globals.TabControl.TabTextColor = Color.White;
-                Globals.TabControl.TabPages.Add("!@#$FillTab!@#$");
-                Globals.TabControl.TabPages.Remove(Globals.TabControl.TabPages[Globals.TabControl.TabPages.Count - 1]);
             }
         }
 
@@ -202,6 +190,18 @@ namespace VisiBoole.Views
             {
                 MainWindowController.LoadDisplay(DisplayType.EDIT); // Switches to default view
             }
+        }
+
+        /// <summary>
+        /// Swaps two indexes of the nav tree.
+        /// </summary>
+        /// <param name="srcIndex">Source index</param>
+        /// <param name="dstIndex">Destination index</param>
+        public void SwapNavTreeNodes(int srcIndex, int dstIndex)
+        {
+            TreeNode dstNode = NavTree.Nodes[0].Nodes[dstIndex];
+            NavTree.Nodes[0].Nodes[dstIndex] = NavTree.Nodes[0].Nodes[srcIndex];
+            NavTree.Nodes[0].Nodes[srcIndex] = dstNode;
         }
 
         /// <summary>

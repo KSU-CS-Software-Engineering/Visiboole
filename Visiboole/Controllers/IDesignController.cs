@@ -18,6 +18,7 @@
  * If not, see <http://www.gnu.org/licenses/>
  */
 
+using CustomTabControl;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -90,6 +91,13 @@ namespace VisiBoole.Controllers
         /// Set the themes of all Designs
         /// </summary>
         void SetThemes();
+
+        /// <summary>
+        /// Handles the event that occurs when two tab pages are swapped.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="eventArgs"></param>
+        void SwapDesignTabIndexes(object sender, TabSwapEventArgs eventArgs);
 
         /// <summary>
         /// Parses the active design.

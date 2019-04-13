@@ -18,7 +18,9 @@
  * If not, see <http://www.gnu.org/licenses/>
  */
 
+using CustomTabControl;
 using System.Collections.Generic;
+using VisiBoole.Models;
 using VisiBoole.ParsingEngine.ObjectCode;
 using VisiBoole.Views;
 
@@ -90,6 +92,20 @@ namespace VisiBoole.Controllers
         /// </summary>
         /// <param name="name">Name of the file to keep open</param>
         void CloseFilesExceptFor(string name);
+
+        /// <summary>
+        /// Handles the event that occurs when an edit has been made to a design.
+        /// </summary>
+        /// <param name="sender">Design being edited</param>
+        /// <param name="eventArgs">Arguments of the edit</param>
+        void OnDesignEdit(object sender, DesignEditEventArgs eventArgs);
+
+        /// <summary>
+        /// Handles the event that occurs when two designs are being swapped on the tab control.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="eventArgs"></param>
+        void SwapDesigns(object sender, TabSwapEventArgs eventArgs);
 
         /// <summary>
         /// Set theme of Designs

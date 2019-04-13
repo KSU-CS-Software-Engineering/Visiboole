@@ -81,6 +81,18 @@ namespace VisiBoole.Controllers
         bool CloseTab(int index);
 
         /// <summary>
+        /// Updates the tab text to include or remove the dirty indicator.
+        /// </summary>
+        /// <param name="designName">Design name of the tab to update</param>
+        /// <param name="isDirty">Whether the design has unsaved changes</param>
+        void UpdateTabText(string designName, bool isDirty);
+
+        /// <summary>
+        /// Sets the theme of edit and run tab control
+        /// </summary>
+        void SetTheme();
+
+        /// <summary>
         /// Displays the provided output to the browser.
         /// </summary>
         /// <param name="output">Output of the parsed design</param>

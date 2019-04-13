@@ -224,7 +224,7 @@ namespace VisiBoole.ParsingEngine
             Statements = ParseStatements();
             if (Statements == null)
             {
-                ErrorDialogBox.Display(ErrorLog);
+                ErrorListBox.Display(ErrorLog);
                 return null;
             }
 
@@ -294,7 +294,7 @@ namespace VisiBoole.ParsingEngine
             Statements = ParseStatements();
             if (Statements == null)
             {
-                ErrorDialogBox.Display(ErrorLog);
+                ErrorListBox.Display(ErrorLog);
                 return null;
             }
             UpdateExpressionStatements();
@@ -316,7 +316,7 @@ namespace VisiBoole.ParsingEngine
             // Check design for valid module declaration
             if (Design.ModuleDeclaration == null || !Regex.IsMatch(Design.ModuleDeclaration, ModulePattern))
             {
-                ErrorDialogBox.Display(new List<string>(new string[] { $"Unable to locate a valid module declaration inside design '{Design.FileName}'. Please check your source file for errors." }));
+                ErrorListBox.Display(new List<string>(new string[] { $"Unable to locate a valid module declaration inside design '{Design.FileName}'. Please check your source file for errors." }));
                 return null;
             }
 
@@ -337,7 +337,7 @@ namespace VisiBoole.ParsingEngine
             Statements = ParseStatements();
             if (Statements == null)
             {
-                ErrorDialogBox.Display(new List<string>(new string[] { $"Error parsing design '{Design.FileName}'. Please check/run your source file for errors." }));
+                ErrorListBox.Display(new List<string>(new string[] { $"Error parsing design '{Design.FileName}'. Please check/run your source file for errors." }));
                 return null;
             }
             UpdateExpressionStatements();
