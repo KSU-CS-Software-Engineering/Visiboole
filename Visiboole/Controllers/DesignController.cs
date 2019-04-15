@@ -187,10 +187,6 @@ namespace VisiBoole.Controllers
                 }
 
                 Designs.Remove(name);
-                for (int i = 0; i < Globals.TabControl.TabPages.Count; i++)
-                {
-                    Globals.TabControl.TabPages[i].Design().TabPageIndex = i;
-                }
 
                 return true;
             }
@@ -209,21 +205,6 @@ namespace VisiBoole.Controllers
             {
                 design.SetFontSize();
             }
-        }
-
-        /// <summary>
-        /// Handles the event that occurs when two tab pages are swapped.
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="eventArgs"></param>
-        public void SwapDesignTabIndexes(object sender, TabSwapEventArgs eventArgs)
-        {
-            NewTabControl tabControl = (NewTabControl)sender;
-            string srcDesignName = tabControl.TabPages[eventArgs.SourceTabPageIndex].Text.TrimStart('*');
-            string dstDesignName = tabControl.TabPages[eventArgs.DestinationTabPageIndex].Text.TrimStart('*');
-
-            Designs[srcDesignName].TabPageIndex = eventArgs.DestinationTabPageIndex;
-            Designs[dstDesignName].TabPageIndex = eventArgs.SourceTabPageIndex;
         }
 
         /// <summary>

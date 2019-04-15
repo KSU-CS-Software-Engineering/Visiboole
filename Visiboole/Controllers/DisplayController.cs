@@ -91,7 +91,7 @@ namespace VisiBoole.Controllers
 			set
 			{
 				value.AddTabControl(TabControl);
-                string currentDesign = TabControl.SelectedTab != null ? TabControl.SelectedTab.Name.TrimStart('*') : "";
+                string currentDesign = TabControl.SelectedTab != null ? TabControl.SelectedTab.Text.TrimStart('*') : "";
 				value.AddBrowser(currentDesign, Browser);
 				currentDisplay = value;
 			}
@@ -126,6 +126,9 @@ namespace VisiBoole.Controllers
                     }
                 }
             };
+            TabControl.TabSwap += (sender, e) => {
+                MainWindowController.SwapDesignNodes(e.SourceTabPageIndex, e.DestinationTabPageIndex);
+            };
             Globals.TabControl = TabControl;
 
             // Init browser
@@ -147,7 +150,6 @@ namespace VisiBoole.Controllers
         public void AttachMainWindowController(IMainWindowController mainWindowController)
 		{
 			MainWindowController = mainWindowController;
-            TabControl.TabSwap += MainWindowController.SwapDesigns;
         }
 
         /// <summary>
@@ -203,7 +205,7 @@ namespace VisiBoole.Controllers
             if (index != -1)
             {
                 TabControl.SelectTab(index);
-                return TabControl.SelectedTab.Name;
+                return TabControl.SelectedTab.Text.TrimStart('*');
             }
             else
             {
@@ -231,27 +233,25 @@ namespace VisiBoole.Controllers
 
                 TabControl.TabPages.RemoveByKey(design.FileName);
                 TabControl.TabPages.Insert(index, tab);
-                design.TabPageIndex = TabControl.TabPages.IndexOf(tab);
                 TabControl.SelectTab(tab);
                 return false;
             }
             else
             {
                 TabControl.TabPages.Add(tab);
-                design.TabPageIndex = TabControl.TabPages.IndexOf(tab);
                 TabControl.SelectTab(tab);
                 return true;
             }
         }
 
         /// <summary>
-        /// Closes a specific tab in the tab control
+        /// Closes a specific tab in the tab control.
         /// </summary>
-        /// <param name="index">Index to close</param>
+        /// <param name="designName">Name of the design being closed</param>
         /// <returns>Whether the operation was successful</returns>
-        public bool CloseTab(int index)
+        public bool CloseTab(string designName)
         {
-            TabPage tab = TabControl.TabPages[index];
+            TabPage tab = TabControl.TabPages[GetDesignTabIndex(designName)];
 
             if (tab != null)
             {
@@ -303,7 +303,7 @@ namespace VisiBoole.Controllers
             }
             else
             {
-
+                
             }
         }
 

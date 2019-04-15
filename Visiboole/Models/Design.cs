@@ -13,50 +13,9 @@ namespace VisiBoole.Models
     /// <summary>
     /// Delegate for design edit events.
     /// </summary>
-    /// <param name="sender"></param>
-    /// <param name="eventArgs"></param>
-    public delegate void DesignEditEventHandler(object sender, DesignEditEventArgs eventArgs);
-
-    /// <summary>
-    /// Event arguments for a design edit event.
-    /// </summary>
-    public class DesignEditEventArgs : EventArgs
-    {
-        /// <summary>
-        /// Whether the design has unsaved changes.
-        /// </summary>
-        public bool IsDirty { get; private set; }
-
-        /// <summary>
-        /// Whether the design has selected text.
-        /// </summary>
-        public bool SelectedText { get; private set; }
-
-        /// <summary>
-        /// Edit history of the design.
-        /// </summary>
-        public Stack EditHistory { get; private set; }
-
-        /// <summary>
-        /// Undo history of the design.
-        /// </summary>
-        public Stack UndoHistory { get; private set; }
-
-        /// <summary>
-        /// Constructs a DesignEditEventArgs with the provided isDirty bool and edit and undo stack histories.
-        /// </summary>
-        /// <param name="isDirty">Whether the design has unsaved changes</param>
-        /// <param name="selectedText">Whether the design has selected text</param>
-        /// <param name="editHistroy">Edit history of the design</param>
-        /// <param name="undoHistory">Undo histroy of the design</param>
-        public DesignEditEventArgs(bool isDirty, bool selectedText, Stack editHistroy, Stack undoHistory)
-        {
-            IsDirty = isDirty;
-            SelectedText = selectedText;
-            EditHistory = editHistroy;
-            UndoHistory = undoHistory;
-        }
-    }
+    /// <param name="designName">Name of the design that was edited</param>
+    /// <param name="isDirty">Whether the design has unsaved changes</param>
+    public delegate void DesignEditEventHandler(string designName, bool isDirty);
 
     /// <summary>
     /// A User-Created Design
@@ -74,11 +33,6 @@ namespace VisiBoole.Models
         public Database Database { get; set; }
 
         /// <summary>
-        /// The index of the TabControl that this occupies
-        /// </summary>
-        public int TabPageIndex { get; set; }
-
-        /// <summary>
         /// The file location that this Design is saved in
         /// </summary>
         public FileInfo FileSource { get; private set; }
@@ -88,10 +42,10 @@ namespace VisiBoole.Models
         /// </summary>
         public string FileName { get; private set; }
 
-		/// <summary>
-		/// Returns True if this Design Text does not match the FileSource contents
-		/// </summary>
-		public bool IsDirty { get; private set; }
+        /// <summary>
+        /// Returns True if this Design Text does not match the FileSource contents
+        /// </summary>
+        public bool IsDirty { get; private set; }
 
         /// <summary>
         /// Previous text of the design.
@@ -101,12 +55,12 @@ namespace VisiBoole.Models
         /// <summary>
         /// Edit history of the design.
         /// </summary>
-        private Stack EditHistory;
+        public Stack EditHistory { get; private set; }
 
         /// <summary>
         /// Undo history of the design.
         /// </summary>
-        private Stack UndoHistory;
+        public Stack UndoHistory { get; private set; }
 
         /// <summary>
         /// Regex for identifying a module declaration.
@@ -139,6 +93,25 @@ namespace VisiBoole.Models
             }
 
             Text = GetFileText();
+            InitDesign();
+        }
+
+        public Design(string name, string text)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new ArgumentNullException("Invalid filename");
+            }
+
+            if (text == null)
+            {
+                throw new ArgumentNullException("Invalid text");
+
+            }
+        }
+
+        private void InitDesign()
+        {
             LastText = Text;
             IsDirty = false;
             Database = new Database();
@@ -150,7 +123,7 @@ namespace VisiBoole.Models
             KeyDown += Design_KeyDown;
 
             AcceptsTab = true;
-	        ShowLineNumbers = true;
+            ShowLineNumbers = true;
 
             SetTheme();
             SetFontSize();
@@ -351,13 +324,11 @@ namespace VisiBoole.Models
                 SelectionStart = loc + edit.Length;
             }
 
-            /*
             if (!IsDirty)
             {
-                UpdateDirty();
+                IsDirty = true;
             }
             ProcessDesignEdit();
-            */
         }
 
         /// <summary>
@@ -365,7 +336,7 @@ namespace VisiBoole.Models
         /// </summary>
         private void ProcessDesignEdit()
         {
-            DesignEdit?.Invoke(this, new DesignEditEventArgs(IsDirty, SelectedText.Length > 0, EditHistory, UndoHistory));
+            DesignEdit?.Invoke(FileName, IsDirty);
         }
 
         /// <summary>
@@ -496,14 +467,12 @@ namespace VisiBoole.Models
             }
 
             // Update dirty and display
-            /*
             OnTextChanged(new EventArgs());
             if (!IsDirty)
             {
                 IsDirty = true;
             }
             ProcessDesignEdit();
-            */
         }
 
         /// <summary>
@@ -595,6 +564,7 @@ namespace VisiBoole.Models
             {
                 File.WriteAllText(FileSource.FullName, Text);
                 IsDirty = false;
+                ProcessDesignEdit();
             }
         }
     }

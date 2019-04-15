@@ -93,13 +93,6 @@ namespace VisiBoole.Controllers
         void SetThemes();
 
         /// <summary>
-        /// Handles the event that occurs when two tab pages are swapped.
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="eventArgs"></param>
-        void SwapDesignTabIndexes(object sender, TabSwapEventArgs eventArgs);
-
-        /// <summary>
         /// Parses the active design.
         /// </summary>
         /// <returns>Output of the parsed design</returns>

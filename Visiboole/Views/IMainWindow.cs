@@ -35,12 +35,6 @@ namespace VisiBoole.Views
         void AttachMainWindowController(IMainWindowController controller);
 
         /// <summary>
-        /// Update buttons and icons based on the display
-        /// </summary>
-        /// <param name="current"></param>
-        void UpdateControls(IDisplay display, DesignEditEventArgs eventArgs = null);
-
-        /// <summary>
         /// Adds a new node in the TreeView
         /// </summary>
         /// <param name="path">The filepath string that will be parsed to obtain the name of this treenode</param>

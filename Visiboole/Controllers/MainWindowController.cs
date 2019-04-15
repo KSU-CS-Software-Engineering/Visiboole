@@ -205,11 +205,11 @@ namespace VisiBoole.Controllers
         /// <summary>
         /// Closes a file with the provided name.
         /// </summary>
-        /// <param name="name">Name of file to close</param>
+        /// <param name="designName">Name of file to close</param>
         /// <returns>The name of the file closed</returns>
-        private string CloseFile(string name)
+        private string CloseFile(string designName)
         {
-            Design design = DesignController.GetDesign(name);
+            Design design = DesignController.GetDesign(designName);
 
             if (design != null)
             {
@@ -217,7 +217,7 @@ namespace VisiBoole.Controllers
 
                 if (design.IsDirty)
                 {
-                    DialogResult result = DialogBox.New("Confirm", $"{name} has unsaved changes. Would you like to save these changes?", DialogType.YesNoCancel);
+                    DialogResult result = DialogBox.New("Confirm", $"{designName} has unsaved changes. Would you like to save these changes?", DialogType.YesNoCancel);
                     if (result == DialogResult.No)
                     {
                         save = false;
@@ -229,10 +229,10 @@ namespace VisiBoole.Controllers
                 }
 
                 // Otherwise close file
-                DisplayController.CloseTab(design.TabPageIndex);
-                DesignController.CloseDesign(name, save);
-                MainWindow.RemoveNavTreeNode(design.FileName);
-                return design.FileName;
+                DisplayController.CloseTab(designName);
+                DesignController.CloseDesign(designName, save);
+                MainWindow.RemoveNavTreeNode(designName);
+                return designName;
             }
             else
             {
@@ -288,23 +288,22 @@ namespace VisiBoole.Controllers
         /// <summary>
         /// Handles the event that occurs when an edit has been made to a design.
         /// </summary>
-        /// <param name="sender">Design being edited</param>
-        /// <param name="eventArgs">Arguments of the edit</param>
-        public void OnDesignEdit(object sender, DesignEditEventArgs eventArgs)
+        /// <param name="designName">Name of the design that was edited</param>
+        /// <param name="isDirty">Whether the design has unsaved changes</param>
+        public void OnDesignEdit(string designName, bool isDirty)
         {
-            DisplayController.UpdateTabText(((Design)sender).FileName, eventArgs.IsDirty);
-            MainWindow.UpdateControls(DisplayController.CurrentDisplay, eventArgs);
+            DisplayController.UpdateTabText(designName, isDirty);
+            LoadDisplay(DisplayType.EDIT);
         }
 
         /// <summary>
-        /// Handles the event that occurs when two designs are being swapped on the tab control.
+        /// Swaps two nav tree nodes.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="eventArgs"></param>
-        public void SwapDesigns(object sender, TabSwapEventArgs eventArgs)
+        /// <param name="srcIndex">Source index of the swap</param>
+        /// <param name="dstIndex">Destination index of the swap</param>
+        public void SwapDesignNodes(int srcIndex, int dstIndex)
         {
-            MainWindow.SwapNavTreeNodes(eventArgs.SourceTabPageIndex, eventArgs.DestinationTabPageIndex);
-            DesignController.SwapDesignTabIndexes(sender, eventArgs);
+            MainWindow.SwapNavTreeNodes(srcIndex, dstIndex);
         }
 
         /// <summary>

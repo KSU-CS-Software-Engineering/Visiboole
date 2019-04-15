@@ -96,16 +96,16 @@ namespace VisiBoole.Controllers
         /// <summary>
         /// Handles the event that occurs when an edit has been made to a design.
         /// </summary>
-        /// <param name="sender">Design being edited</param>
-        /// <param name="eventArgs">Arguments of the edit</param>
-        void OnDesignEdit(object sender, DesignEditEventArgs eventArgs);
+        /// <param name="designName">Name of the design that was edited</param>
+        /// <param name="isDirty">Whether the design has unsaved changes</param>
+        void OnDesignEdit(string designName, bool isDirty);
 
         /// <summary>
-        /// Handles the event that occurs when two designs are being swapped on the tab control.
+        /// Swaps two nav tree nodes.
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="eventArgs"></param>
-        void SwapDesigns(object sender, TabSwapEventArgs eventArgs);
+        /// <param name="srcIndex">Source index of the swap</param>
+        /// <param name="dstIndex">Destination index of the swap</param>
+        void SwapDesignNodes(int srcIndex, int dstIndex);
 
         /// <summary>
         /// Set theme of Designs

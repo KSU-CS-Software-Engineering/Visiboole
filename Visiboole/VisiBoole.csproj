@@ -102,7 +102,9 @@
     <Compile Include="ParsingEngine\ObjectCode\Operator.cs" />
     <Compile Include="ParsingEngine\Parser.cs" />
     <Compile Include="ParsingEngine\Statements\Statement.cs" />
-    <Compile Include="Models\Design.cs" />
+    <Compile Include="Models\Design.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="ParsingEngine\Statements\SubmoduleInstantiationStmt.cs" />
     <Compile Include="ParsingEngine\ObjectCode\Variable.cs" />
     <Compile Include="ParsingEngine\Statements\VariableListStmt.cs" />
@@ -198,6 +200,7 @@
     <None Include="Resources\Letter V blue.ico" />
     <Content Include="license.txt" />
     <Content Include="Resources\Close.png" />
+    <None Include="Resources\Expand.png" />
     <Content Include="Resources\Help Documentation\Syntax.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

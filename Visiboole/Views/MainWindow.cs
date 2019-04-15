@@ -34,6 +34,54 @@ namespace VisiBoole.Views
     /// </summary>
     public partial class MainWindow : Form, IMainWindow
     {
+        private class DarkColorTable : ProfessionalColorTable
+        {
+            public override Color ToolStripDropDownBackground { get { return Color.FromArgb(33, 33, 33); } }
+
+            public override Color ImageMarginGradientBegin { get { return Color.FromArgb(33, 33, 33); } }
+
+            public override Color ImageMarginGradientMiddle { get { return Color.FromArgb(33, 33, 33); } }
+
+            public override Color ImageMarginGradientEnd { get { return Color.FromArgb(33, 33, 33); } }
+
+            public override Color MenuBorder { get { return Color.FromArgb(33, 33, 33); } }
+
+            public override Color MenuItemBorder { get { return Color.FromArgb(66, 66, 66); } }
+
+            public override Color MenuItemSelected { get { return Color.FromArgb(99, 99, 99); } }
+
+            public override Color MenuStripGradientBegin { get { return Color.FromArgb(33, 33, 33); } }
+
+            public override Color MenuStripGradientEnd { get { return Color.FromArgb(33, 33, 33); } }
+
+            public override Color MenuItemSelectedGradientBegin { get { return Color.FromArgb(99, 99, 99); } }
+
+            public override Color MenuItemSelectedGradientEnd { get { return Color.FromArgb(99, 99, 99); } }
+
+            public override Color MenuItemPressedGradientBegin { get { return Color.FromArgb(99, 99, 99); } }
+
+            public override Color MenuItemPressedGradientEnd { get { return Color.FromArgb(99, 99, 99); } }
+
+            public override Color SeparatorLight { get { return Color.FromArgb(99, 99, 99); } }
+
+            public override Color SeparatorDark { get { return Color.FromArgb(99, 99, 99); } }
+
+            public override Color ButtonCheckedGradientBegin { get { return Color.Red; } }
+
+            public override Color ButtonCheckedGradientMiddle { get { return Color.Red; } }
+
+            public override Color ButtonCheckedGradientEnd { get { return Color.Red; } }
+
+            public override Color ButtonCheckedHighlight { get { return Color.FromArgb(99, 99, 99); } }
+
+            public override Color CheckBackground { get { return Color.FromArgb(99, 99, 99); } }
+
+            public override Color CheckPressedBackground { get { return Color.FromArgb(99, 99, 99); } }
+
+            public override Color CheckSelectedBackground { get { return Color.FromArgb(99, 99, 99); } }
+        }
+
+                
         /// <summary>
         /// Handle to the MainWindowController for this view
         /// </summary>
@@ -50,6 +98,22 @@ namespace VisiBoole.Views
             NavTree.NodeMouseClick += (sender, args) => NavTree.SelectedNode = args.Node;
             NavTree.HideSelection = true;
             NavTree.SelectedNode = null;
+            menuStrip1.Renderer = new ToolStripProfessionalRenderer(new DarkColorTable());
+            foreach (ToolStripMenuItem item in menuStrip1.Items)
+            {
+                for (int i = 0; i < item.DropDownItems.Count; i++)
+                {
+                    item.DropDownItems[i].ForeColor = Color.WhiteSmoke;
+                }
+            }
+            menuStrip2.Renderer = new ToolStripProfessionalRenderer(new DarkColorTable());
+            foreach (ToolStripMenuItem item in menuStrip2.Items)
+            {
+                for (int i = 0; i < item.DropDownItems.Count; i++)
+                {
+                    item.DropDownItems[i].ForeColor = Color.WhiteSmoke;
+                }
+            }
         }
 
         /// <summary>
@@ -69,7 +133,7 @@ namespace VisiBoole.Views
         /// Update buttons and icons based on the display
         /// </summary>
         /// <param name="current"></param>
-        public void UpdateControls(IDisplay display, DesignEditEventArgs eventArgs = null)
+        private void UpdateControls(IDisplay display)
         {
             openIcon.Enabled = (display.TypeOfDisplay == DisplayType.EDIT);
             openToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT);
@@ -80,6 +144,7 @@ namespace VisiBoole.Views
             saveToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
             saveAsToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
             runModeToggle.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
+            runStateToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
             newStateToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
             editModeToggle.Enabled = (display.TypeOfDisplay == DisplayType.RUN);
             closeDesignToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
@@ -93,14 +158,14 @@ namespace VisiBoole.Views
                 MainWindowController.SetFontSize();
             }
 
-            if (display.TypeOfDisplay == DisplayType.EDIT && eventArgs != null)
+            if (display.TypeOfDisplay == DisplayType.EDIT && DesignController.ActiveDesign != null)
             {
-                undoToolStripMenuItem.Enabled = eventArgs.EditHistory.Count > 0;
-                undoToolStripMenuItem1.Enabled = eventArgs.EditHistory.Count > 0;
-                redoToolStripMenuItem.Enabled = eventArgs.UndoHistory.Count > 0;
-                redoToolStripMenuItem1.Enabled = eventArgs.UndoHistory.Count > 0;
-                cutToolStripMenuItem.Enabled = eventArgs.SelectedText;
-                copyToolStripMenuItem.Enabled = eventArgs.SelectedText;
+                undoToolStripMenuItem.Enabled = DesignController.ActiveDesign.EditHistory.Count > 0;
+                undoToolStripMenuItem1.Enabled = DesignController.ActiveDesign.EditHistory.Count > 0;
+                redoToolStripMenuItem.Enabled = DesignController.ActiveDesign.UndoHistory.Count > 0;
+                redoToolStripMenuItem1.Enabled = DesignController.ActiveDesign.UndoHistory.Count > 0;
+                cutToolStripMenuItem.Enabled = DesignController.ActiveDesign.SelectedText.Length > 0;
+                copyToolStripMenuItem.Enabled = DesignController.ActiveDesign.SelectedText.Length > 0;
                 pasteToolStripMenuItem.Enabled = Clipboard.ContainsText();
             }
             else
@@ -124,8 +189,8 @@ namespace VisiBoole.Views
             if (theme == "Light" || theme == "light")
             {
                 Properties.Settings.Default.Theme = "Light";
-                menuStrip1.BackColor = Color.FromArgb(33, 33, 33);
-                menuStrip2.BackColor = Color.FromArgb(33, 33, 33);
+                NavTree.Nodes[0].BackColor = Color.DodgerBlue;
+                NavTree.Nodes[0].ForeColor = Color.Black;
                 NavTree.BackColor = Color.DodgerBlue;
                 NavTree.ForeColor = Color.Black;
                 NavTree.HideSelection = true;
@@ -138,8 +203,8 @@ namespace VisiBoole.Views
             else
             {
                 Properties.Settings.Default.Theme = "Dark";
-                menuStrip1.BackColor = Color.FromArgb(33, 33, 33);
-                menuStrip2.BackColor = Color.FromArgb(33, 33, 33);
+                NavTree.Nodes[0].BackColor = Color.FromArgb(48, 48, 48);
+                NavTree.Nodes[0].ForeColor = Color.DodgerBlue;
                 NavTree.BackColor = Color.FromArgb(48, 48, 48);
                 NavTree.ForeColor = Color.DodgerBlue;
                 NavTree.HideSelection = true;
@@ -199,9 +264,23 @@ namespace VisiBoole.Views
         /// <param name="dstIndex">Destination index</param>
         public void SwapNavTreeNodes(int srcIndex, int dstIndex)
         {
+            TreeNode srcNode = NavTree.Nodes[0].Nodes[srcIndex];
             TreeNode dstNode = NavTree.Nodes[0].Nodes[dstIndex];
-            NavTree.Nodes[0].Nodes[dstIndex] = NavTree.Nodes[0].Nodes[srcIndex];
-            NavTree.Nodes[0].Nodes[srcIndex] = dstNode;
+
+            if (srcIndex > dstIndex)
+            {
+                NavTree.Nodes[0].Nodes.RemoveAt(srcIndex);
+                NavTree.Nodes[0].Nodes.RemoveAt(dstIndex);
+                NavTree.Nodes[0].Nodes.Insert(dstIndex, srcNode);
+                NavTree.Nodes[0].Nodes.Insert(srcIndex, dstNode);
+            }
+            else
+            {
+                NavTree.Nodes[0].Nodes.RemoveAt(dstIndex);
+                NavTree.Nodes[0].Nodes.RemoveAt(srcIndex);
+                NavTree.Nodes[0].Nodes.Insert(srcIndex, dstNode);
+                NavTree.Nodes[0].Nodes.Insert(dstIndex, srcNode);
+            }
         }
 
         /// <summary>
@@ -280,7 +359,7 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void IncreaseFontMenuClick(object sender, EventArgs e)
         {
-            Properties.Settings.Default.FontSize += 3;
+            Properties.Settings.Default.FontSize += 2;
             MainWindowController.SetFontSize();
 
             if (editModeToggle.Enabled)
@@ -296,9 +375,9 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void DecreaseFontMenuClick(object sender, EventArgs e)
         {
-            if (Properties.Settings.Default.FontSize > 7)
+            if (Properties.Settings.Default.FontSize > 9)
             {
-                Properties.Settings.Default.FontSize -= 3;
+                Properties.Settings.Default.FontSize -= 2;
                 MainWindowController.SetFontSize();
 
                 if (editModeToggle.Enabled)
@@ -448,10 +527,6 @@ namespace VisiBoole.Views
         private void RunButtonClick(object sender, EventArgs e)
         {
             MainWindowController.Run();
-            if (runModeToggle.DropDown.Visible)
-            {
-                runModeToggle.HideDropDown();
-            }
             previousStateToolStripMenuItem.Enabled = true;
         }
 
@@ -598,28 +673,6 @@ namespace VisiBoole.Views
         }
 
         /// <summary>
-        /// Handles the event when a menu's drop down is opening. 
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void MenuDropDownOpeningEvent(object sender, EventArgs e)
-        {
-            ToolStripMenuItem menu = (ToolStripMenuItem)sender;
-            menu.ForeColor = Color.Black;
-        }
-
-        /// <summary>
-        /// Handles the event when a menu's drop down closed.
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void MenuDropDownClosedEvent(object sender, EventArgs e)
-        {
-            ToolStripMenuItem menu = (ToolStripMenuItem)sender;
-            menu.ForeColor = Color.White;
-        }
-
-        /// <summary>
         /// Handles the event that occurs when the user presses a key on the keyboard.
         /// </summary>
         /// <param name="sender"></param>
@@ -707,26 +760,9 @@ namespace VisiBoole.Views
 
         #endregion
 
-        private void runModeToggle_MouseHover(object sender, EventArgs e)
-        {
-            runModeToggle.ShowDropDown();
-        }
-
-        private void runModeToggle_DropDownClosed(object sender, EventArgs e)
-        {
-            ToolStripMenuItem menu = (ToolStripMenuItem)sender;
-            menu.ForeColor = Color.White;
-        }
-
         private void previousStateToolStripMenuItem_Click(object sender, EventArgs e)
         {
             MainWindowController.RefreshOutput();
-        }
-
-        private void runModeToggle_DropDownOpening(object sender, EventArgs e)
-        {
-            ToolStripMenuItem menu = (ToolStripMenuItem)sender;
-            menu.ForeColor = Color.Black;
         }
     }
 }
