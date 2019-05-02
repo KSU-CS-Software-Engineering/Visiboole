@@ -38,6 +38,20 @@ namespace VisiBoole.ParsingEngine
     /// </summary>
 	public class Parser : Lexer
 	{
+        private class SourceCode
+        {
+            public string Text { get; private set; }
+
+            public StatementType Type { get; private set; }
+
+            public SourceCode(string text, StatementType type)
+            {
+                Text = text;
+                Type = type;
+            }
+        }
+
+
         #region Parsing Patterns & Regular Expressions
 
         /// <summary>
@@ -108,7 +122,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Regex for determining whether expansion is required.
         /// </summary>
-        private static Regex ExpansionRegex = new Regex($@"((?<!{FormatterPattern}){ConcatPattern})|{VectorPattern}|((?<=\W){ConstantPattern})", RegexOptions.Compiled);
+        private static Regex ExpansionRegex { get; } = new Regex($@"((?<!{FormatterPattern}){ConcatPattern})|{VectorPattern}|((?<=\W){ConstantPattern})", RegexOptions.Compiled);
 
         /// <summary>
         /// Regex for identifying comment statements.
@@ -530,6 +544,153 @@ namespace VisiBoole.ParsingEngine
         }
 
         /// <summary>
+        /// Validates, expands and initializes the provided source code.
+        /// </summary>
+        /// <param name="sourceCode">Source code</param>
+        /// <returns>List of expanded source if operations were successful</returns>
+        private List<SourceCode> GetExpandedSourceCode(IEnumerable<string> sourceCode)
+        {
+            // Create expanded source code list to return
+            List<SourceCode> expandedSourceCode = new List<SourceCode>();
+            // Create valid bool
+            bool valid = false;
+            // Start module declaration string
+            Design.ModuleDeclaration = null;
+            // Start line number counter
+            LineNumber = 0;
+            // Declare statement type
+            StatementType? type = StatementType.Empty;
+
+            // For each source in the source code
+            foreach (string source in sourceCode)
+            {
+                // Increment line number counter
+                LineNumber++;
+                // If source is not only whitespace
+                if (!string.IsNullOrWhiteSpace(source))
+                {
+                    // Get statement type
+                    type = GetStatementType(source);
+                }
+
+                // If statement type is null
+                if (type == null)
+                {
+                    // If current execution is valid
+                    if (valid)
+                    {
+                        // Set valid to false
+                        valid = false;
+                    }
+                }
+                // If statement type is library
+                else if (type == StatementType.Library)
+                {
+                    // If library isn't valid and the current execution is valid
+                    if (!VerifyLibraryStatement(source) && valid)
+                    {
+                        // Set valid to false
+                        valid = false;
+                    }
+                }
+                // If statement type is submodule
+                else if (type == StatementType.Submodule)
+                {
+                    // If submodule instantiation isn't valid and the current execution is valid
+                    if (!VerifySubmoduleStatement(source) && valid)
+                    {
+                        // Set valid to false
+                        valid = false;
+                    }
+                }
+                // If statement type is module
+                else if (type == StatementType.Module)
+                {
+                    // If design doesn't have a module declaration
+                    if (Design.ModuleDeclaration == null)
+                    {
+                        // Set the design's module declaration to the source
+                        Design.ModuleDeclaration = source;
+                    }
+                    // If design has a module module declaration
+                    else
+                    {
+                        // Add invalid module statement error to error list
+                        ErrorLog.Add("Designs can only have one module statement.");
+                        // If current execution is valid
+                        if (valid)
+                        {
+                            // Set valid to false
+                            valid = false;
+                        }
+                    }
+                }
+            }
+
+            // If not valid
+            if (!valid)
+            {
+                return null;
+            }
+
+            // Reset line number
+            LineNumber = 0;
+            // For each source in the source code
+            foreach (string source in sourceCode)
+            {
+                // Increment line number counter
+                LineNumber++;
+                // Get expanded source from the source
+                string expandedSource = ExpandSource(source.Replace("**", "").Replace("~~", ""));
+                // If expanded source is null
+                if (expandedSource == null)
+                {
+                    // If current execution is valid
+                    if (valid)
+                    {
+                        // Set valid to false
+                        valid = false;
+                    }
+                    // Continue to next source
+                    continue;
+                }
+
+                // If current execution is valid
+                if (valid)
+                {
+                    // For each line in the expanded source
+                    foreach (string line in expandedSource.Split(';'))
+                    {
+                        bool needsInit = type != StatementType.Comment && type != StatementType.Empty && type != StatementType.Library;
+
+                        // If source needs to be initialized and unable to init line
+                        if (needsInit && !InitSource(line, type))
+                        {
+                            // Set valid to false
+                            valid = false;
+                            // End expanded source iterations
+                            break;
+                        }
+                        // If able to init line
+                        else
+                        {
+                            // Add line to expanded source code list
+                            expandedSourceCode.Add(new SourceCode(line, (StatementType)type));
+                        }
+                    }
+                }
+            }
+
+            // If module declaration verify
+            if (!string.IsNullOrEmpty(Design.ModuleDeclaration) && !VerifyModuleDeclarationStatement())
+            {
+                valid = false;
+            }
+
+            return valid ? expandedSourceCode : null;
+        }
+
+        /// <summary>
         /// Creates a list of statements from parsed source code.
         /// </summary>
         /// <returns>List of statements</returns>
@@ -541,202 +702,66 @@ namespace VisiBoole.ParsingEngine
             MemoryStream stream = new MemoryStream(bytes);
             using (StreamReader reader = new StreamReader(stream))
             {
-                Design.ModuleDeclaration = null;
-                LineNumber = 0;
-                foreach (string source in ReadLines(reader))
+                List<SourceCode> expandedSourceCode = GetExpandedSourceCode(ReadLines(reader));
+                if (expandedSourceCode == null)
                 {
-                    // Increment line number
-                    LineNumber++;
-                    StatementType? type = null;
+                    return null;
+                }
 
-                    // If source is only whitespace
-                    if (string.IsNullOrWhiteSpace(source))
+                foreach (SourceCode source in expandedSourceCode)
+                {
+                    if (source.Type == StatementType.Library)
                     {
-                        // If current execution is valid
-                        if (valid)
-                        {
-                            // Add empty statement to statement list
-                            statements.Add(new EmptyStmt(source));
-                        }
-                        // Continue loop
                         continue;
                     }
-                    // If source is a comment statement
-                    else if (CommentStmtRegex.IsMatch(source))
+                    else if (source.Type == StatementType.Empty)
                     {
-                        // If current execution is valid
-                        if (valid)
-                        {
-                            // Get comment match
-                            Match commentMatch = CommentStmtRegex.Match(source);
-                            // If comment should be displayed
-                            if (commentMatch.Groups["DoInclude"].Value != "-" && (Properties.Settings.Default.SimulationComments || commentMatch.Groups["DoInclude"].Value == "+"))
-                            {
-                                string comment = $"{commentMatch.Groups["FrontSpacing"].Value}{commentMatch.Groups["Comment"].Value}";
-                                // Add comment statement to statement list
-                                statements.Add(new CommentStmt(comment));
-                            }
-                        }
-                        // Continue loop
-                        continue;
+                        // Add empty statement to statement list
+                        statements.Add(new EmptyStmt(source.Text));
                     }
-                    // If source is a library statement
-                    else if (LibraryStmtRegex.IsMatch(source))
+                    else if (source.Type == StatementType.Comment)
                     {
-                        // If library statement doesn't contain a valid library
-                        if (!VerifyLibraryStatement(source))
+                        // Get comment match
+                        Match commentMatch = CommentStmtRegex.Match(source.Text);
+                        // If comment should be displayed
+                        if (commentMatch.Groups["DoInclude"].Value != "-" && (Properties.Settings.Default.SimulationComments || commentMatch.Groups["DoInclude"].Value == "+"))
                         {
-                            // Set valid to false
-                            valid = false;
-                        }
-                        // Continue loop (Libraries don't get added to statement list)
-                        continue;
-                    }
-                    // If source is none of the above
-                    else
-                    {
-                        // Get statement type
-                        type = GetStatementType(source);
-
-                        if (type == null)
-                        {
-                            // Set valid to false
-                            valid = false;
-                            // Continue loop
-                            continue;
+                            string comment = $"{commentMatch.Groups["FrontSpacing"].Value}{commentMatch.Groups["Comment"].Value}";
+                            // Add comment statement to statement list
+                            statements.Add(new CommentStmt(comment));
                         }
                     }
-
-                    // If source is a submodule statement
-                    if (SubmoduleStmtRegex.IsMatch(source))
+                    else if (source.Type == StatementType.Boolean)
                     {
-                        // If submodule instantiation isn't valid
-                        if (!VerifySubmoduleStatement(source))
-                        {
-                            // Set valid to false
-                            valid = false;
-                            // Continue loop
-                            continue;
-                        }
+                        // Add boolean statement to statement list
+                        statements.Add(new BooleanAssignmentStmt(source.Text));
                     }
-                    // If source is a module statement
-                    else if (ModuleRegex.IsMatch(source))
+                    else if (source.Type == StatementType.Clock)
                     {
-                        // If design doesn't have a module declaration
-                        if (Design.ModuleDeclaration == null)
-                        {
-                            // Set the design's module declaration to the source
-                            Design.ModuleDeclaration = source;
-                        }
-                        // If design has a module module declaration
-                        else
-                        {
-                            // Add invalid module statement error to error list
-                            ErrorLog.Add("Designs can only have one module statement.");
-                            // Set valid to false
-                            valid = false;
-                            // Continue loop
-                            continue;
-                        }
+                        // Add clock statement to statement list
+                        statements.Add(new DffClockStmt(source.Text));
                     }
-                    else
+                    else if (source.Type == StatementType.VariableList)
                     {
-                        // Verify source from its statement type
-                        if (!VerifyStatement(source, type))
-                        {
-                            // Set valid to false
-                            valid = false;
-                            // Continue loop
-                            continue;
-                        }
+                        // Add variable list statement to statement list
+                        statements.Add(new VariableListStmt(source.Text));
                     }
-
-                    // Remove double **
-                    string line = source.Replace("**", "");
-                    // Remove double ~~
-                    line = line.Replace("~~", "");
-
-                    bool needsExpansion = ExpansionRegex.IsMatch(line) || type == StatementType.Submodule;
-                    if (needsExpansion && line.Contains("=") && !line.Contains("+") && !line.Contains("-"))
+                    else if (source.Type == StatementType.FormatSpecifier)
                     {
-                        // Vertical expansion needed
-                        line = ExpandVertically(line);
-                        if (line == null)
-                        {
-                            valid = false;
-                            continue;
-                        }
+                        // Add format specifier statement to statement list
+                        statements.Add(new FormatSpecifierStmt(source.Text));
                     }
-                    else if (needsExpansion)
+                    else if (source.Type == StatementType.Module)
                     {
-                        // Horizontal expansion needed
-                        if (type != StatementType.Submodule && type != StatementType.Module)
-                        {
-                            line = ExpandHorizontally(line);
-                        }
-                        else
-                        {
-                            // Get text that shouldn't be expanded
-                            string frontText = line.Substring(0, line.IndexOf("(") + 1);
-                            // Get text that needs to be expanded
-                            string restOfText = line.Substring(frontText.Length);
-                            // Combine front text with the expanded form of the rest of the text
-                            line = $"{frontText}{ExpandHorizontally(restOfText)}";
-                        }
+                        // Add module declaration statement to statement list
+                        statements.Add(new ModuleDeclarationStmt(source.Text));
                     }
-
-                    string[] expandedLines = line.Split(new string[] { ";" }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (string expandedLine in expandedLines)
+                    else if (source.Type == StatementType.Submodule)
                     {
-                        if (type == StatementType.Boolean)
-                        {
-                            try
-                            {
-                                statements.Add(new BooleanAssignmentStmt(expandedLine));
-                            }
-                            catch (Exception)
-                            {
-                                valid = false;
-                                continue;
-                            }
-                        }
-                        else if (type == StatementType.Clock)
-                        {
-                            try
-                            {
-                                statements.Add(new DffClockStmt(expandedLine));
-                            }
-                            catch (Exception)
-                            {
-                                valid = false;
-                                continue;
-                            }
-                        }
-                        else if (type == StatementType.FormatSpecifier)
-                        {
-                            statements.Add(new FormatSpecifierStmt(expandedLine));
-                        }
-                        else if (type == StatementType.VariableList)
-                        {
-                            statements.Add(new VariableListStmt(expandedLine));
-                        }
-                        else if (type == StatementType.Submodule)
-                        {
-                            Match match = ModuleInstantiationRegex.Match(expandedLine);
-                            statements.Add(new SubmoduleInstantiationStmt(expandedLine, Subdesigns[match.Groups["Design"].Value]));
-                        }
-                        else if (type == StatementType.Module)
-                        {
-                            statements.Add(new ModuleDeclarationStmt(expandedLine));
-                        }
+                        Match match = ModuleInstantiationRegex.Match(source.Text);
+                        statements.Add(new SubmoduleInstantiationStmt(source.Text, Subdesigns[match.Groups["Design"].Value]));
                     }
                 }
-            }
-
-            // If module declaration verify
-            if (!String.IsNullOrEmpty(Design.ModuleDeclaration) && !VerifyModuleDeclarationStatement())
-            {
-                valid = false;
             }
 
             // If valid return statement list
@@ -747,51 +772,6 @@ namespace VisiBoole.ParsingEngine
         #endregion
 
         #region Statement Verifications
-
-        /// <summary>
-        /// Verifies the statement from the provided line
-        /// </summary>
-        /// <param name="line">Line of the statement</param>
-        /// <param name="type">Type of statement</param>
-        /// <returns>Whether the statement is valid or not</returns>
-        private bool VerifyStatement(string line, StatementType? type)
-        {
-            if (type == StatementType.Boolean || type == StatementType.Clock)
-            {
-                // Verify expressions
-                int start = line.ToList<char>().FindIndex(c => char.IsWhiteSpace(c) == false); // First non whitespace character
-                string dependent;
-                string operation;
-                string expression;
-                if (!line.Contains("<"))
-                {
-                    operation = "=";
-                    dependent = line.Substring(start, line.IndexOf('=') - start).Trim();
-                }
-                else
-                {
-                    if (!line.Contains("@"))
-                    {
-                        operation = "<=";
-                    }
-                    else
-                    {
-                        operation = Regex.Match(line, @"<=@\S+").Value;
-                    }
-                    dependent = line.Substring(start, line.IndexOf('<') - start).Trim();
-                }
-                expression = line.Substring(line.IndexOf(operation) + operation.Length).Trim();
-                expression = expression.TrimEnd(';');
-                expression = String.Concat("(", expression, ")"); 
-
-                if (!VerifyExpressionStatement(expression))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
 
         /// <summary>
         /// Verifies an expression statement
@@ -1069,6 +1049,128 @@ namespace VisiBoole.ParsingEngine
 
         #endregion
 
+        /// <summary>
+        /// Initializes variables and dependencies in the provided source.
+        /// </summary>
+        /// <param name="source">Source to init</param>
+        /// <param name="type">Statement type of source</param>
+        /// <returns>Whether the source was initialized</returns>
+        private bool InitSource(string source, StatementType? type)
+        {
+            // Init dependents list
+            List<string> dependents = new List<string>();
+            // Init dependencies list
+            List<string> dependencies = new List<string>();
+            // Init dependent seperator index
+            int dependentSeperatorIndex = source.IndexOf('=');
+
+            // Get variables in the statement
+            MatchCollection variableMatches = ScalarRegex.Matches(source);
+            // Iterate through all variables in the statement
+            foreach (Match variableMatch in variableMatches)
+            {
+                // Get variable
+                string variable = variableMatch.Value;
+                // Get value of variable
+                bool value = variable.Contains("*");
+                // If value is true
+                if (value)
+                {
+                    // Remove * from variable
+                    variable = variable.TrimStart('*');
+                }
+                // Get whether the variable is a dependent
+                bool isDependent = variableMatch.Index < dependentSeperatorIndex;
+
+                // If statement type is not boolean
+                if (type != StatementType.Boolean)
+                {
+                    // If variable isn't in the database
+                    if (Design.Database.TryGetVariable<Variable>(variable) == null)
+                    {
+                        // Add variable to the database
+                        Design.Database.AddVariable(new IndependentVariable(variable, value));
+                    }
+
+                    // If variable is a dependent
+                    if (isDependent)
+                    {
+                        // Get dependent name
+                        string dependent = $"{variable}.d";
+                        // If dependent isn't in the database
+                        if (Design.Database.TryGetVariable<Variable>(dependent) == null)
+                        {
+                            // Add dependent to the database
+                            Design.Database.AddVariable(new DependentVariable(dependent, value));
+                        }
+                    }
+                }
+                // If statement type is boolean
+                else
+                {
+                    // If variable isn't dependent
+                    if (!isDependent)
+                    {
+                        // If dependents contains the variable
+                        if (dependents.Contains(variable))
+                        {
+                            // Circular dependency error
+                            return false;
+                        }
+
+                        // Add variable to dependencies list
+                        dependencies.Add(variable);
+                    }
+                    // If variable is dependent
+                    else
+                    {
+                        // Add variable to dependents list
+                        dependents.Add(variable);
+                    }
+
+                    // If variable isn't in the database
+                    if (Design.Database.TryGetVariable<Variable>(variable) == null)
+                    {
+                        // If variable isn't dependent
+                        if (!isDependent)
+                        {
+                            // Add variable to the database
+                            Design.Database.AddVariable(new IndependentVariable(variable, value));
+                        }
+                        // If variable is dependent
+                        else
+                        {
+                            // Add variable to the database
+                            Design.Database.AddVariable(new DependentVariable(variable, value));
+                        }
+                    }
+                    // If variable is in the database
+                    else
+                    {
+                        // If variable is dependent, in the database not as a dependent
+                        if (isDependent && Design.Database.TryGetVariable<DependentVariable>(variable) == null)
+                        {
+                            // Make variable in database a dependent
+                            Design.Database.MakeDependent(variable);
+                        }
+                    }
+                }
+            }
+
+            // For each dependent in depedents list
+            foreach (string dependent in dependents)
+            {
+                // If unable to add dependency list to database
+                if (!Design.Database.TryAddDependencyList(dependent, dependencies))
+                {
+                    // Circular dependency error
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         #region Expansion Methods
 
         /// <summary>
@@ -1078,14 +1180,19 @@ namespace VisiBoole.ParsingEngine
         /// <returns>List of expansion components</returns>
         protected List<string> ExpandToken(Match token)
         {
-            if (token.Value.Contains("[") && String.IsNullOrEmpty(token.Groups["LeftBound"].Value))
+            if (token.Value.Contains("[") && string.IsNullOrEmpty(token.Groups["LeftBound"].Value))
             {
                 List<string> components = Design.Database.GetComponents(token.Groups["Name"].Value);
+                if (components == null)
+                {
+                    return null;
+                }
+
                 if (token.Value.Contains("~") && !components[0].Contains("~"))
                 {
                     for (int i = 0; i < components.Count; i++)
                     {
-                        components[i] = String.Concat("~", components[i]);
+                        components[i] = string.Concat("~", components[i]);
                     }
                 }
                 return components;
@@ -1137,7 +1244,13 @@ namespace VisiBoole.ParsingEngine
 
                 if (match.Value.Contains("[") || match.Value.Contains("'") || match.Value.All(char.IsDigit))
                 {
-                    expansion.AddRange(ExpandToken(match));
+                    List<string> tokenExpansion = ExpandToken(match);
+                    if (tokenExpansion == null)
+                    {
+                        return null;
+                    }
+
+                    expansion.AddRange(tokenExpansion);
                 }
                 else
                 {
@@ -1149,11 +1262,52 @@ namespace VisiBoole.ParsingEngine
         }
 
         /// <summary>
+        /// Expands the provided source.
+        /// </summary>
+        /// <param name="source">Source to expand</param>
+        /// <returns>Expanded source</returns>
+        private string ExpandSource(string source)
+        {
+            // Get line count inside source
+            int lineCount = source.Count(c => c == '\n');
+            // Get whether the source needs to be expanded
+            bool needsExpansion = ExpansionRegex.IsMatch(source) || source.Contains(':');
+            // If source needs to be expanded, is an expression statement and is not a mathematical expression
+            if (needsExpansion && source.Contains("=") && !source.Contains("+") && !source.Contains("-"))
+            {
+                // Vertical expansion needed
+                source = ExpandVertically(source);
+            }
+            // If source needs to be expanded
+            else if (needsExpansion)
+            {
+                // Horizontal expansion needed
+                if (!source.Contains(':'))
+                {
+                    source = ExpandHorizontally(source);
+                }
+                else
+                {
+                    // Get text that shouldn't be expanded
+                    string frontText = source.Substring(0, source.IndexOf("(") + 1);
+                    // Get text that needs to be expanded
+                    string restOfText = source.Substring(frontText.Length);
+                    // Combine front text with the expanded form of the rest of the text
+                    source = $"{frontText}{ExpandHorizontally(restOfText)}";
+                }
+            }
+
+            // Increment line number by the line count
+            LineNumber += lineCount;
+            return source;
+        }
+
+        /// <summary>
         /// Expands all concatenations and vectors in a line.
         /// </summary>
         /// <param name="line">Line to expand</param>
         /// <returns>Expanded line</returns>
-        protected string ExpandHorizontally(string line)
+        private string ExpandHorizontally(string line)
         {
             string expandedLine = line;
             Match match;
@@ -1161,30 +1315,30 @@ namespace VisiBoole.ParsingEngine
             while ((match = VectorRegex2.Match(expandedLine)).Success)
             {
                 // Replace matched vector with its components
-                expandedLine = expandedLine.Substring(0, match.Index) + String.Join(" ", GetExpansion(match)) + expandedLine.Substring(match.Index + match.Length);
+                expandedLine = expandedLine.Substring(0, match.Index) + string.Join(" ", GetExpansion(match)) + expandedLine.Substring(match.Index + match.Length);
             }
 
-            while ((match = ConstantRegex2.Match(expandedLine)).Success && match.Value != ("1") && match.Value != ("0"))
+            while ((match = ConstantRegex2.Match(expandedLine)).Success && match.Value != "1" && match.Value != "0")
             {
                 // Replace matched constants with its components
-                expandedLine = expandedLine.Substring(0, match.Index) + String.Join(" ", GetExpansion(match)) + expandedLine.Substring(match.Index + match.Length);
+                expandedLine = expandedLine.Substring(0, match.Index) + string.Join(" ", GetExpansion(match)) + expandedLine.Substring(match.Index + match.Length);
             }
 
-            if (line.Contains("=") || line.Contains(":"))
+            if (line.Contains('='))
             {
                 Regex variableListRegex = new Regex($@"{VariableListPattern}(?![^{{}}]*\}})"); // Variable lists not inside {}
                 while ((match = variableListRegex.Match(expandedLine)).Success)
                 {
                     // Add { } to the matched variable list
-                    expandedLine = expandedLine.Substring(0, match.Index) + String.Concat("{", match.Value, "}") + expandedLine.Substring(match.Index + match.Length);
+                    expandedLine = expandedLine.Substring(0, match.Index) + string.Concat("{", match.Value, "}") + expandedLine.Substring(match.Index + match.Length);
                 }
             }
-            else
+            else if (!line.Contains(':'))
             {
                 while ((match = ConcatRegex.Match(expandedLine)).Success)
                 {
                     // Replace matched concat with its components
-                    expandedLine = expandedLine.Substring(0, match.Index) + String.Join(" ", GetExpansion(match)) + expandedLine.Substring(match.Index + match.Length);
+                    expandedLine = expandedLine.Substring(0, match.Index) + string.Join(" ", GetExpansion(match)) + expandedLine.Substring(match.Index + match.Length);
                 }
             }
 
@@ -1198,10 +1352,10 @@ namespace VisiBoole.ParsingEngine
         /// <returns>Expanded lines</returns>
         protected string ExpandVertically(string line)
         {
-            string expanded = String.Empty;
+            string expanded = string.Empty;
 
             // Get dependent and expression
-            int start = line.ToList<char>().FindIndex(c => char.IsWhiteSpace(c) == false); // First non whitespace character
+            int start = line.ToList().FindIndex(c => char.IsWhiteSpace(c) == false); // First non whitespace character
             string dependent = line.Contains("<")
                 ? line.Substring(start, line.IndexOf("<") - start).TrimEnd()
                 : line.Substring(start, line.IndexOf("=") - start).TrimEnd();
@@ -1213,15 +1367,21 @@ namespace VisiBoole.ParsingEngine
             Match dependentMatch = AnyTypeRegex.Match(dependent);
             if (dependentMatch.Value.Contains("{"))
             {
-                dependentExpansion.AddRange(GetExpansion(dependentMatch));
+                dependentExpansion = GetExpansion(dependentMatch);
             }
             else if (dependentMatch.Value.Contains("["))
             {
-                dependentExpansion.AddRange(ExpandToken(dependentMatch));
+                dependentExpansion = ExpandToken(dependentMatch);
             }
             else
             {
                 dependentExpansion.Add(dependent);
+            }
+            
+            // If expansion fails
+            if (dependentExpansion == null)
+            {
+                return null;
             }
 
             // Expand expression
@@ -1242,6 +1402,12 @@ namespace VisiBoole.ParsingEngine
                     expansion = GetExpansion(match);
                 }
 
+                // If expansion fails
+                if (expansion == null)
+                {
+                    return null;
+                }
+
                 if (canPad)
                 {
                     int paddingCount = dependentExpansion.Count - expansion.Count;
@@ -1260,7 +1426,7 @@ namespace VisiBoole.ParsingEngine
                 List<string> expressionExpansion = expressionExpansions[i];
                 if (dependentExpansion.Count != expressionExpansion.Count)
                 {
-                    ErrorLog.Add($"{LineNumber}: Expansion count of '{matches[i].Value}' doesn't equal the expansion count of '{dependent}'.");
+                    ErrorLog.Add($"{LineNumber + line.Substring(0, matches[i].Index).Count(c => c == '\n')}: Expansion count of '{matches[i].Value}' doesn't equal the expansion count of '{dependent}'.");
                     return null;
                 }
             }

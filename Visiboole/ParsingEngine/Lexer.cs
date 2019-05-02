@@ -33,12 +33,69 @@ namespace VisiBoole.ParsingEngine
 
         #endregion
 
+        #region Token Class and Types
+
+        private enum TokenType
+        {
+            Scalar,
+            Vector,
+            Constant,
+            Assignment,
+            Clock,
+            NegationOperator,
+            BooleanOperator,
+            MathOperator,
+            Formatter,
+            Declaration,
+            Instantiation,
+            Whitespace,
+            Newline,
+            Semicolon,
+            Colon,
+            Comma,
+            OpenParenthesis,
+            CloseParenthesis,
+            OpenBrace,
+            CloseBrace
+        }
+
+        private class Token
+        {
+            public TokenType Type { get; private set; }
+
+            public string Text { get; private set; }
+            
+            public int Index { get; private set; }
+
+            public Token(string text, TokenType type, int index)
+            {
+                Text = text;
+                Type = type;
+                Index = index;
+            }
+        }
+
+        private class VariableToken
+        {
+            public string Text { get; private set; }
+
+            public bool PartOfGrouping { get; private set; }
+
+            public VariableToken(string text, bool partOfGrouping)
+            {
+                Text = text;
+                PartOfGrouping = partOfGrouping;
+            }
+        }
+
+        #endregion
+
         #region Lexer Patterns and Regular Expressions
 
         /// <summary>
         /// Pattern for identifying names.
         /// </summary>
-        private static readonly string NamePattern = @"(?<Name>[_a-zA-Z]\w*(?<!\d))";
+        private static readonly string NamePattern = @"(?<Name>[a-zA-Z][[a-zA-Z0-9]*(?<!\d))";
 
         /// <summary>
         /// Pattern for identifying scalars. (No ~ or *)
@@ -103,12 +160,12 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Pattern for identifying submodule instantiations.
         /// </summary>
-        public static readonly string InstantiationPattern = @"(?<Design>\w+)\.(?<Name>\w+)";
+        public static readonly string InstantiationPattern = @"(?<Design>\w+)\.(?<Name>[a-zA-Z0-9]+)";
 
         /// <summary>
         /// Pattern for identifying components (inputs or outputs) in a module notation.
         /// </summary>
-        private static readonly string ModuleComponentPattern = $@"({AnyTypePattern}(,\s+{AnyTypePattern})*)";
+        private static readonly string ModuleComponentPattern = $@"(({AnyTypePattern}|{VariableListPattern})(,\s+({AnyTypePattern}|{VariableListPattern}))*)";
 
         /// <summary>
         /// Pattern for identifying modules.
@@ -129,11 +186,6 @@ namespace VisiBoole.ParsingEngine
         /// Pattern for identifying invalid characters.
         /// </summary>
         private static readonly string InvalidPattern = @"[^\s_a-zA-Z0-9~@%^*()=+[\]{}<|:;',.-]";
-
-        /// <summary>
-        /// Regex for identifying bits.
-        /// </summary>
-        private static Regex BitRegex { get; } = new Regex(@"\d+$", RegexOptions.Compiled);
 
         /// <summary>
         /// Regex for identifying scalars. (Optional ~ or *)
@@ -228,20 +280,89 @@ namespace VisiBoole.ParsingEngine
         // To Do: Format Specifiers not inside each other.
         //        All variables in this kind of statement must be in a formatter.
 
-        protected StatementType? GetStatementType(string line)
+        /// <summary>
+        /// Returns the token type of the provided lexeme.
+        /// </summary>
+        /// <param name="lexeme">Lexeme</param>
+        /// <param name="seperatorChar">Seperator character after lexeme</param>
+        /// <returns>Token type of lexeme</returns>
+        private TokenType? GetTokenType(string lexeme, char seperatorChar)
         {
-            // Create statement type
-            StatementType? statementType = null;
+            if (lexeme == Design.FileName && seperatorChar == '(')
+            {
+                return TokenType.Declaration;
+            }
+            else if (IsScalar(lexeme))
+            {
+                return TokenType.Scalar;
+            }
+            else if (IsVector(lexeme))
+            {
+                return TokenType.Vector;
+            }
+            else if (OperatorRegex.IsMatch(lexeme))
+            {
+                if (lexeme == "|" || lexeme == "^" || lexeme == "==")
+                {
+                    return TokenType.BooleanOperator;
+                }
+                else if (lexeme.Contains('~'))
+                {
+                    return TokenType.NegationOperator;
+                }
+                else if (lexeme == "+" || lexeme == "-")
+                {
+                    return TokenType.MathOperator;
+                }
+                else if (lexeme == "=")
+                {
+                    return TokenType.Assignment;
+                }
+                else
+                {
+                    return TokenType.Clock;
+                }
+            }
+            else if (IsConstant(lexeme))
+            {
+                return TokenType.Constant;
+            }
+            else if (FormatterRegex.IsMatch(lexeme))
+            {
+                return TokenType.Formatter;
+            }
+            else if (InstantiationRegex.IsMatch(lexeme) && seperatorChar == '(')
+            {
+                return TokenType.Instantiation;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Returns a list of tokens from the provided line
+        /// </summary>
+        /// <param name="line">Line to generate tokens</param>
+        /// <returns>List of tokens from the line</returns>
+        private List<Token> GetTokens(string line)
+        {
             // Create tokens list
-            List<string> tokens = new List<string>();
+            List<Token> tokens = new List<Token>();
             // Create string builder for current lexeme
             StringBuilder lexeme = new StringBuilder();
+            // Index of lexeme
+            int lexemeIndex = 0;
             // Create groupings stack
             Stack<char> groupings = new Stack<char>();
+            // Save current line number
+            int lineNumber = LineNumber;
 
-            // Iterate through all characters in the provided line
-            foreach (char c in line)
+            for (int i = 0; i < line.Length; i++)
             {
+                // Get current character
+                char c = line[i];
                 // Get character as a string
                 string newChar = c.ToString();
                 // Get current lexme
@@ -251,107 +372,409 @@ namespace VisiBoole.ParsingEngine
                 if (InvalidRegex.IsMatch(newChar))
                 {
                     // Add invalid character error to error log
-                    ErrorLog.Add($"{LineNumber}: Invalid character '{c}'.");
+                    ErrorLog.Add($"{lineNumber}: Invalid character '{c}'.");
                     // Return null
                     return null;
                 }
                 // If the character is a seperator character
                 else if (SeperatorRegex.IsMatch(newChar))
                 {
-                    // If there is a token before the seperator
                     if (currentLexeme.Length > 0)
                     {
-                        // If current lexeme isn't a token or isn't valid
-                        if (!IsToken(currentLexeme, c) || !ValidateCurrentToken(line, c, currentLexeme, ref statementType, groupings))
+                        TokenType? tokenType = GetTokenType(currentLexeme, c);
+                        if (tokenType == null)
                         {
-                            // Return null
                             return null;
                         }
 
-                        // Add current lexeme to tokens list
-                        tokens.Add(currentLexeme);
+                        // Add current token to tokens list
+                        tokens.Add(new Token(currentLexeme, (TokenType)tokenType, lexemeIndex));
                         // Clear current lexeme
                         lexeme = lexeme.Clear();
                     }
 
-                    // Validate ending token
-                    if (!ValidateSeperatorToken(line, c, currentLexeme, ref statementType, groupings, tokens))
+                    if (c == ' ')
                     {
-                        return null;
+                        tokens.Add(new Token(newChar, TokenType.Whitespace, i));
                     }
-
-                    // If character is an opening grouping
-                    if (c == '{' || c == '(')
+                    else if (c == '\n')
                     {
-                        // Add grouping char to stack
-                        groupings.Push(c);
+                        lineNumber++;
+                        tokens.Add(new Token(newChar, TokenType.Newline, i));
                     }
-                    // If character is a closing grouping
-                    else if (c == '}' || c == ')')
+                    else if (c == ';')
                     {
-                        // If groupings stack isn't empty
-                        if (groupings.Count > 0)
+                        if (tokens.Count == 0 || tokens.Any(token => token.Type == TokenType.Semicolon))
                         {
-                            // Get the top grouping
-                            char top = groupings.Peek();
-                            // If the top grouping matches the closing grouping
-                            if ((c == ')' && top == '(') || (c == '}' && top == '{'))
-                            {
-                                // Pop top grouping
-                                groupings.Pop();
-                            }
-                            // If the top grouping doesn't match the closing grouping
-                            else
-                            {
-                                // Add grouping error to error log
-                                ErrorLog.Add($"{LineNumber}: '{top}' must be matched first.");
-                                // Return null
-                                return null;
-                            }
-                        }
-                        // If groupings stack is empty
-                        else
-                        {
-                            // Add grouping error to error log
-                            ErrorLog.Add($"{LineNumber}: Unmatched '{c}'.");
-                            // Return null
+                            ErrorLog.Add($"{LineNumber}: ';' can only be used to end a statement.");
                             return null;
                         }
+
+                        tokens.Add(new Token(newChar, TokenType.Semicolon, i));
+                    }
+                    else if (c == ':')
+                    {
+                        tokens.Add(new Token(newChar, TokenType.Colon, i));
+                    }
+                    else if (c == ',')
+                    {
+                        tokens.Add(new Token(newChar, TokenType.Comma, i));
+                    }
+                    else if (c == '(' || c == '{')
+                    {
+                        if (groupings.Count > 0 && groupings.Peek() == '{')
+                        {
+                            if (c == '{')
+                            {
+                                // Concatenation inside concatenation error
+                                ErrorLog.Add($"{lineNumber}: Concatenations can't be used inside other concatenations.");
+                            }
+                            else
+                            {
+                                // Parenthesis inside concatenation error
+                                ErrorLog.Add($"{lineNumber}: Parenthesis can't be used inside concatenations.");
+                            }
+                            return null;
+                        }
+
+                        if (c == '(')
+                        {
+                            tokens.Add(new Token(newChar, TokenType.OpenParenthesis, i));
+                        }
+                        else
+                        {
+                            tokens.Add(new Token(newChar, TokenType.OpenBrace, i));
+                        }
+                        groupings.Push(c);
+                    }
+                    else if (c == ')' || c == '}')
+                    {
+                        char top = groupings.Count > 0 ? groupings.Pop() : '\0';
+                        if ((c == ')' && top != '(') || (c == '}' && top != '{'))
+                        {
+                            if (top == '\0')
+                            {
+                                // New grouping error
+                                ErrorLog.Add($"{lineNumber}: '{c}' cannot be matched.");
+                            }
+                            else
+                            {
+                                // Unmatched grouping error
+                                ErrorLog.Add($"{lineNumber}: '{c}' cannot be matched. '{top}' must be matched first.");
+                            }
+                            return null;
+                        }
+
+                        if (c == ')')
+                        {
+                            tokens.Add(new Token(newChar, TokenType.CloseParenthesis, i));
+                        }
+                        else
+                        {
+                            tokens.Add(new Token(newChar, TokenType.CloseBrace, i));
+                        }
                     }
 
-                    if (c == '\n')
-                    {
-                        LineNumber++;
-                    }
-                    // Add seperator to tokens list
-                    tokens.Add(newChar);
+                    // Advance lexeme index
+                    lexemeIndex = i + 1;
                 }
                 // If the character is not a seperator character
                 else
                 {
-                    // Check for constant inside {}
-                    if (c == '\'')
-                    {
-                        // Check for constant bit count inside {}
-                        if (groupings.Count > 0 && groupings.Peek() == '{' && (String.IsNullOrEmpty(currentLexeme) || !currentLexeme.All(ch => Char.IsDigit(ch))))
-                        {
-                            ErrorLog.Add($"{LineNumber}: Constants in concatenation fields must specify bit count.");
-                            return null;
-                        }
-                    }
-
                     // Append new character to the current lexeme
                     lexeme.Append(c);
                 }
             }
 
-            // If there are unclosed groupings
             if (groupings.Count > 0)
             {
-                // Add groupings error to error log
-                ErrorLog.Add($"{LineNumber}: '{groupings.Peek()}' is not matched.");
-                // Return null
+                // Unmatched grouping error
+                ErrorLog.Add($"{lineNumber}: '{groupings.Peek()}' was not matched.");
                 return null;
+            }
+
+            return tokens;
+        }
+
+        protected StatementType? GetStatementType(string line)
+        {
+            // Create statement type
+            StatementType? statementType = null;
+            // Create variable token list
+            List<VariableToken> variables = new List<VariableToken>();
+            // Create open parenthesis stack
+            Stack<int> openParenthesesIndexes = new Stack<int>();
+            // Whether the current token is inside a module
+            bool insideModule = false;
+            // Whether the current token is inside a formatter
+            bool insideFormat = false;
+            // Whether the current token is inside a concat
+            bool insideConcat = false;
+
+            // Get tokens list
+            List<Token> tokens = GetTokens(line);
+            // If tokens list is empty
+            if (tokens == null)
+            {
+                return statementType;
+            }
+
+            Token lastToken = null;
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                Token token = tokens[i];
+                List<Token> previousTokens = i != 0 ? tokens.GetRange(0, i): new List<Token>();
+
+                if (token.Type == TokenType.Newline)
+                {
+                    // Increment line number
+                    LineNumber++;
+                }
+                else if (token.Type == TokenType.OpenParenthesis)
+                {
+                    if (statementType == StatementType.FormatSpecifier || statementType == null)
+                    {
+                        ErrorLog.Add($"{LineNumber}: '(' can't be used in a format specifier or variable list statement.");
+                        return null;
+                    }
+
+                    insideModule = lastToken != null && (lastToken.Type == TokenType.Declaration || lastToken.Type == TokenType.Instantiation);
+                    openParenthesesIndexes.Push(token.Index);
+                }
+                else if (token.Type == TokenType.CloseParenthesis)
+                {
+                    if (statementType == StatementType.FormatSpecifier || statementType == null)
+                    {
+                        ErrorLog.Add($"{LineNumber}: ')' can't be used in a format specifier or variable list statement.");
+                        return null;
+                    }
+
+                    insideModule = false;
+                    // Check parenthesis
+
+                }
+                else if (token.Type == TokenType.OpenBrace)
+                {
+                    insideConcat = true;
+                    insideFormat = lastToken != null && tokens[i - 1].Type == TokenType.Formatter;
+                }
+                else if (token.Type == TokenType.CloseBrace)
+                {
+                    insideConcat = false;
+                    insideFormat = false;
+                }
+                else if (token.Type == TokenType.Comma)
+                {
+                    if (!insideModule)
+                    {
+                        ErrorLog.Add($"{LineNumber}: ',' can only be used inside the () in a submodule or module statement.");
+                        return null;
+                    }
+                }
+                else if (token.Type == TokenType.Colon)
+                {
+                    if (!insideModule)
+                    {
+                        ErrorLog.Add($"{LineNumber}: ':' can only be used to seperate input and output variables in a module or submodule statement.");
+                        return null;
+                    }
+
+                    if (previousTokens.Any(t => t.Type == TokenType.Colon))
+                    {
+                        ErrorLog.Add($"{LineNumber}: ':' can only be used once in a module or submodule statement.");
+                        return null;
+                    }
+                }
+                else if (token.Type == TokenType.Declaration)
+                {
+                    if (statementType != null)
+                    {
+                        ErrorLog.Add($"{LineNumber}: Invalid module declaration.");
+                        return null;
+                    }
+
+                    statementType = StatementType.Module;
+                    insideModule = true;
+                }
+                else if (token.Type == TokenType.Instantiation)
+                {
+                    if (statementType != null)
+                    {
+                        ErrorLog.Add($"{LineNumber}: Invalid module instantiation.");
+                        return null;
+                    }
+
+                    if (previousTokens.Count(t => t.Type != TokenType.Whitespace && t.Type != TokenType.Newline) > 0)
+                    {
+                        /*
+                        ErrorLog.Add($"{LineNumber}: Module instantiations must o.");
+                        */
+                        return null;
+                    }
+
+                    if (!ValidateInstantiation(InstantiationRegex.Match(token.Text), line))
+                    {
+                        return null;
+                    }
+
+                    statementType = StatementType.Submodule;
+                    insideModule = true;
+                }
+                else if (token.Type == TokenType.Scalar || token.Type == TokenType.Vector || token.Type == TokenType.Constant)
+                {
+                    if (statementType == StatementType.Boolean || statementType == StatementType.Clock)
+                    {
+                        if (token.Text.Contains('*'))
+                        {
+                            ErrorLog.Add($"{LineNumber}: '*' cannot be used on the right side of a boolean or clock statement.");
+                            return null;
+                        }
+
+                        if (insideConcat && token.Text.Contains('~'))
+                        {
+                            ErrorLog.Add($"{LineNumber}: '~' can't be used inside a concatenation.");
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        if (token.Text.Contains('~'))
+                        {
+                            ErrorLog.Add($"{LineNumber}: '~' can only be used on the right side of a boolean or clock statement.");
+                            return null;
+                        }
+
+                        if (statementType == StatementType.FormatSpecifier)
+                        {
+                            if (!insideFormat)
+                            {
+                                ErrorLog.Add($"{LineNumber}: Variables or constants in a format specifier statement must be inside a format specifier.");
+                                return null;
+                            }
+                        }
+                        else if (statementType == StatementType.Module || statementType == StatementType.Submodule)
+                        {
+                            if (!insideModule)
+                            {
+                                ErrorLog.Add($"{LineNumber}: Variables or constants in module or submodule statements must be inside an instantiation or declaration.");
+                                return null;
+                            }
+                        }
+                    }
+
+                    if (token.Type == TokenType.Constant && insideConcat && !(char.IsDigit(token.Text.TrimStart('~')[0]) && token.Text.Contains('\'')))
+                    {
+                        ErrorLog.Add($"{LineNumber}: Constants in concatenations must specify a bit count.");
+                        return null;
+                    }
+
+                    if (token.Type != TokenType.Constant && !variables.Any(v => v.Text == token.Text))
+                    {
+                        variables.Add(new VariableToken(token.Text, insideConcat));
+                    }
+                }
+                else if (token.Type == TokenType.Assignment || token.Type == TokenType.Clock)
+                {
+                    if (statementType != null)
+                    {
+                        ErrorLog.Add($"{LineNumber}: '{token.Text}' can only precede dependent(s) once in a statement.");
+                        return null;
+                    }
+                    else
+                    {
+                        statementType = token.Type == TokenType.Assignment ? StatementType.Boolean : StatementType.Clock;
+                    }
+
+                    if (previousTokens.Any(t => t.Text.Contains('*')))
+                    {
+                        ErrorLog.Add($"{LineNumber}: '{token.Text}' cannot be used with '*'.");
+                        return null;
+                    }
+
+                    if (previousTokens.Any(t => t.Type == TokenType.Constant))
+                    {
+                        ErrorLog.Add($"{LineNumber}: Constants can't be used on the left side of a boolean statement.");
+                        return null;
+                    }
+
+                    if (variables.Count == 0)
+                    {
+                        ErrorLog.Add($"{LineNumber}: '{token.Text}' can only be used after a dependent in boolean or clock statements.");
+                        return null;
+                    }
+
+                    if (variables.Count > 1 && variables.Count(v => !v.PartOfGrouping) > 0)
+                    {
+                        ErrorLog.Add($"{LineNumber}: In order to use multiple variables for a dependent, you must place the variables inside a concatenation.");
+                        return null;
+                    }
+                }
+                else if (token.Type == TokenType.BooleanOperator || token.Type == TokenType.NegationOperator || token.Type == TokenType.MathOperator)
+                {
+                    if (insideConcat)
+                    {
+                        ErrorLog.Add($"{LineNumber}: '{token.Text}' can't be used inside a concatenation.");
+                        return null;
+                    }
+
+                    if (statementType != StatementType.Boolean && statementType != StatementType.Clock)
+                    {
+                        ErrorLog.Add($"{LineNumber}: '{token.Text}' operator can only be used in a boolean or clock statement.");
+                        return null;
+                    }
+
+                    if (token.Type == TokenType.BooleanOperator || token.Type == TokenType.NegationOperator)
+                    {
+                        if (tokens.Any(t => t.Type == TokenType.MathOperator))
+                        {
+                            ErrorLog.Add($"{LineNumber}: Math operators (+ and -) cannot be used with boolean operators in a boolean or clock statement.");
+                            return null;
+                        }
+
+                        if (token.Type == TokenType.NegationOperator && (i + 1 < tokens.Count))
+                        {
+                            ErrorLog.Add($"{LineNumber}: '~' must be attached to a scalar, vector, constant, parenthesis or concatenation.");
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        if (tokens.Any(t => token.Type == TokenType.BooleanOperator || token.Type == TokenType.NegationOperator))
+                        {
+                            ErrorLog.Add($"{LineNumber}: Math operators (+ and -) cannot be used with boolean operators in a boolean or clock statement.");
+                            return null;
+                        }
+                    }
+                }
+                else if (token.Type == TokenType.Formatter)
+                {
+                    if (insideFormat)
+                    {
+                        ErrorLog.Add($"{LineNumber}: Formatters can't be used inside other formatters.");
+                        return null;
+                    }
+
+                    if (statementType != null && statementType != StatementType.FormatSpecifier)
+                    {
+                        ErrorLog.Add($"{LineNumber}: '{token.Text}' can only be used in a format specifier statement.");
+                        return null;
+                    }
+                    else if (statementType == null)
+                    {
+                        if (previousTokens.Any(t => token.Type == TokenType.Scalar || token.Type == TokenType.Vector || token.Type == TokenType.Constant))
+                        {
+                            ErrorLog.Add($"{LineNumber}: All variables or constants in a format specifier statement must be inside a format specifier.");
+                            return null;
+                        }
+
+                        statementType = StatementType.FormatSpecifier;
+                    }
+                }
+
+                if (token.Type != TokenType.Whitespace && token.Type != TokenType.Newline)
+                {
+                    lastToken = token;
+                }
             }
 
             // If there are no errors and the statement type is still null
@@ -368,7 +791,7 @@ namespace VisiBoole.ParsingEngine
         #region Token Verifications
 
         /// <summary>
-        /// Returns whether the provided lexeme is a token.
+        /// Returns whether the provided lexeme is a recognized token.
         /// </summary>
         /// <param name="lexeme">Lexeme to interpret</param>
         /// <param name="seperatorChar">Character seperator</param>
@@ -416,53 +839,60 @@ namespace VisiBoole.ParsingEngine
         /// <returns>Whether the lexeme is a scalar</returns>
         private bool IsScalar(string lexeme)
         {
-            if (ScalarRegex.IsMatch(lexeme))
+            // Try to match lexeme as a scalar
+            Match scalarMatch = ScalarRegex.Match(lexeme);
+            // If lexeme is a scalar
+            if (scalarMatch.Success)
             {
                 // Get scalar name and bit
-                Match bitMatch = BitRegex.Match(lexeme);
-                int bit = bitMatch.Success ? Convert.ToInt32(bitMatch.Value) : -1;
-                string name = bitMatch.Success ? lexeme.Substring(0, bitMatch.Index) : lexeme;
+                string name = scalarMatch.Groups["Name"].Value;
+                int bit = string.IsNullOrEmpty(scalarMatch.Groups["Bit"].Value) ? -1 : Convert.ToInt32(scalarMatch.Groups["Bit"].Value);
 
-                // Check for invalid bit
+                // If scalar bit is larger than 31
                 if (bit > 31)
                 {
-                    ErrorLog.Add($"{LineNumber}: Bit count of '{name}' must be between 0 and 31.");
+                    ErrorLog.Add($"{LineNumber}: Bit count of '{lexeme}' must be between 0 and 31.");
                     return false;
                 }
 
-                // Check scalar name has at least one letter
-                if (!name.Any(c => char.IsLetter(c)))
+                // If scalar doesn't contain a bit
+                if (bit == -1)
                 {
-                    ErrorLog.Add($"{LineNumber}: Scalar name '{name}' must contain at least one letter.");
-                    return false;
+                    // If namespace belongs to a vector
+                    if (Design.Database.NamespaceBelongsToVector(name))
+                    {
+                        // Add namespace error to error log
+                        ErrorLog.Add($"{LineNumber}: Namespace '{name}' is already being used by a vector.");
+                        return false;
+                    }
+                    // If namespace doesn't exist
+                    else if (!Design.Database.NamespaceExists(name))
+                    {
+                        // Update namespace with no bit
+                        Design.Database.UpdateNamespace(name, bit);
+                    }
                 }
-
-                name = name.TrimStart('*').TrimStart('~');
-                lexeme = lexeme.TrimStart('*').TrimStart('~');
-
-                // Check for taken namespace
-                if (Design.Database.GetComponents(name) != null && bit == -1)
-                {
-                    ErrorLog.Add($"{LineNumber}: Namespace '{name}' is already being used by a vector.");
-                    return false;
-                }
-
-                // Add namespace component
-                if (bit != -1)
-                {
-                    Design.Database.AddNamespaceComponent(name, lexeme);
-                }
+                // If scalar does contain a bit
                 else
                 {
-                    if (!Design.Database.HasNamespace(name))
+                    // If namespace exists and doesn't belong to a vector
+                    if (Design.Database.NamespaceExists(name) && !Design.Database.NamespaceBelongsToVector(name))
                     {
-                        Design.Database.AddNamespaceComponent(name, null);
+                        // Add namespace error to error log
+                        ErrorLog.Add($"{LineNumber}: Namespace '{name}' is already being used by a scalar.");
+                        return false;
                     }
-                    
+                    // If namespace doesn't exist or belongs to a vector
+                    else
+                    {
+                        // Update/add namespace with bit
+                        Design.Database.UpdateNamespace(name, bit);
+                    }
                 }
 
                 return true;
             }
+            // If lexeme is not a scalar
             else
             {
                 return false;
@@ -476,64 +906,82 @@ namespace VisiBoole.ParsingEngine
         /// <returns>Whether the lexeme is a vector</returns>
         private bool IsVector(string lexeme)
         {
-            Match match = VectorRegex.Match(lexeme);
-            if (match.Success)
+            // Try to match lexeme as a vector
+            Match vectorMatch = VectorRegex.Match(lexeme);
+            // If lexeme is a vector
+            if (vectorMatch.Success)
             {
-                // Check for invalid vector namespace name
-                string vectorNamespace = match.Groups["Name"].Value;
-                if (Char.IsDigit(vectorNamespace[vectorNamespace.Length - 1]))
+                // Get vector name
+                string name = vectorMatch.Groups["Name"].Value;
+
+                // If vector name ends in a number
+                if (char.IsDigit(name[name.Length - 1]))
                 {
-                    ErrorLog.Add($"{LineNumber}: Vector name '{vectorNamespace}' cannot end in a number.");
+                    // Add vector name error to error log
+                    ErrorLog.Add($"{LineNumber}: Vector name '{name}' cannot end in a number.");
                     return false;
                 }
 
-                // Check vector bounds and step
-                int leftBound = String.IsNullOrEmpty(match.Groups["LeftBound"].Value) ? -1 : Convert.ToInt32(match.Groups["LeftBound"].Value);
-                int step = String.IsNullOrEmpty(match.Groups["Step"].Value) ? -1 : Convert.ToInt32(match.Groups["Step"].Value);
-                int rightBound = String.IsNullOrEmpty(match.Groups["RightBound"].Value) ? -1 : Convert.ToInt32(match.Groups["RightBound"].Value);
+                // Get vector bounds and step
+                int leftBound = string.IsNullOrEmpty(vectorMatch.Groups["LeftBound"].Value) ? -1 : Convert.ToInt32(vectorMatch.Groups["LeftBound"].Value);
+                int step = string.IsNullOrEmpty(vectorMatch.Groups["Step"].Value) ? -1 : Convert.ToInt32(vectorMatch.Groups["Step"].Value);
+                int rightBound = string.IsNullOrEmpty(vectorMatch.Groups["RightBound"].Value) ? -1 : Convert.ToInt32(vectorMatch.Groups["RightBound"].Value);
+                
+                // If left bound or right bound is greater than 31
                 if (leftBound > 31 || rightBound > 31)
                 {
+                    // Add vector bounds error to error log
                     ErrorLog.Add($"{LineNumber}: Vector bounds of '{lexeme}' must be between 0 and 31.");
                     return false;
                 }
-                else if (step > 31)
+                // If step is not between 1 and 31
+                else if (step == 0 || step > 31)
                 {
-                    ErrorLog.Add($"{LineNumber}: Vector step of '{lexeme}' must be between 0 and 31.");
+                    // Add vector step error to error log
+                    ErrorLog.Add($"{LineNumber}: Vector step of '{lexeme}' must be between 1 and 31.");
                     return false;
                 }
 
                 // Check for invalid [] notation
-                if (!Design.Database.HasNamespace(vectorNamespace) && leftBound == -1)
+                /*
+                if (!Design.Database.HasVectorNamespace(name) && leftBound == -1)
                 {
-                    ErrorLog.Add($"{LineNumber}: '{vectorNamespace}[]' cannot be used without an explicit dimension somewhere.");
+                    ErrorLog.Add($"{LineNumber}: '{name}[]' cannot be used without an explicit dimension somewhere.");
+                    return false;
+                }
+                */
+
+                // If namespace exists and doesn't belong to a vector
+                if (Design.Database.NamespaceExists(name) && !Design.Database.NamespaceBelongsToVector(name))
+                {
+                    // Add namespace error to error log
+                    ErrorLog.Add($"{LineNumber}: Namespace '{name}' is already being used by a scalar.");
                     return false;
                 }
 
-                // Check for taken namespace
-                if (Design.Database.GetComponents(vectorNamespace) == null && Design.Database.HasNamespace(vectorNamespace))
-                {
-                    ErrorLog.Add($"{LineNumber}: Namespace '{vectorNamespace}' is already being used by a scalar.");
-                    return false;
-                }
-
+                // If vector is explicit
                 if (leftBound != -1)
                 {
+                    // If left bound is least significant bit
                     if (leftBound < rightBound)
                     {
-                        // Flips bounds so MSB is the leftBound
+                        // Flips bounds so left bound is most significant bit
                         leftBound = leftBound + rightBound;
                         rightBound = leftBound - rightBound;
                         leftBound = leftBound - rightBound;
                     }
 
+                    // For each bit in the vector bounds
                     for (int i = leftBound; i >= rightBound; i--)
                     {
-                        Design.Database.AddNamespaceComponent(vectorNamespace, String.Concat(vectorNamespace, i));
+                        // Update/add bit to namespace
+                        Design.Database.UpdateNamespace(name, i);
                     }
                 }
 
                 return true;
             }
+            // If lexeme is not a vector
             else
             {
                 return false;
@@ -547,17 +995,22 @@ namespace VisiBoole.ParsingEngine
         /// <returns>Whether the lexeme is a constant</returns>
         private bool IsConstant(string lexeme)
         {
-            Match match = ConstantRegex.Match(lexeme);
-            if (match.Success)
+            // Try to match lexeme as a constant
+            Match constantMatch = ConstantRegex.Match(lexeme);
+            // If lexeme is a constant
+            if (constantMatch.Success)
             {
-                // Check bit count
-                if (!String.IsNullOrEmpty(match.Groups["BitCount"].Value) && Convert.ToInt32(match.Groups["BitCount"].Value) > 32)
+                // If the provided bit count is greater than 32 bits
+                if (!string.IsNullOrEmpty(constantMatch.Groups["BitCount"].Value) && Convert.ToInt32(constantMatch.Groups["BitCount"].Value) > 32)
                 {
-                    ErrorLog.Add($"{LineNumber}: Constant can have at most 32 bits.");
+                    // Add constant bit count error to error log
+                    ErrorLog.Add($"{LineNumber}: Constant '{lexeme}' can only have at most 32 bits.");
                     return false;
                 }
+
                 return true;
             }
+            // If lexeme is not a constant
             else
             {
                 return false;
@@ -781,6 +1234,15 @@ namespace VisiBoole.ParsingEngine
             return true;
         }
 
+        private bool ValidateParentheses(List<Token> tokens)
+        {
+            // Remove embedded parenthesis
+            if (tokens.Any(t => t.Type == TokenType.OpenParenthesis))
+            {
+
+            }
+        }
+
         /// <summary>
         /// Validates a submodule instantiation.
         /// </summary>
@@ -836,9 +1298,10 @@ namespace VisiBoole.ParsingEngine
                                 }
                             }
 
+                            // If file is not found
                             if (file == null)
                             {
-                                // Not found
+                                // Add file not found to error log
                                 ErrorLog.Add($"{LineNumber}: Unable to find a design named '{designName}' with a module declaration.");
                                 return false;
                             }
@@ -897,38 +1360,47 @@ namespace VisiBoole.ParsingEngine
         /// <returns>List of vector components</returns>
         protected List<string> ExpandVector(Match vector)
         {
+            // Create expansion return list
             List<string> expansion = new List<string>();
 
             // Get vector name, bounds and step
             string name = vector.Value.Contains("*")
-                ? String.Concat(vector.Value[0], vector.Groups["Name"].Value)
+                ? string.Concat(vector.Value[0], vector.Groups["Name"].Value)
                 : vector.Groups["Name"].Value;
             int leftBound = Convert.ToInt32(vector.Groups["LeftBound"].Value);
             int rightBound = Convert.ToInt32(vector.Groups["RightBound"].Value);
+
+            // If left bound is least significant bit
             if (leftBound < rightBound)
             {
-                int step = String.IsNullOrEmpty(vector.Groups["Step"].Value) ? 1 : Convert.ToInt32(vector.Groups["Step"].Value);
+                // Get vector step
+                int step = string.IsNullOrEmpty(vector.Groups["Step"].Value) ? 1 : Convert.ToInt32(vector.Groups["Step"].Value);
 
-                // Expand vector
+                // For each bit in the step
                 for (int i = leftBound; i <= rightBound; i += step)
                 {
-                    expansion.Add(String.Concat(name, i));
+                    // Add bit to expansion
+                    expansion.Add(string.Concat(name, i));
                 }
             }
+            // If right bound is least significant bit
             else
             {
-                int step = String.IsNullOrEmpty(vector.Groups["Step"].Value) ? -1 : -Convert.ToInt32(vector.Groups["Step"].Value);
+                // Get vector step
+                int step = string.IsNullOrEmpty(vector.Groups["Step"].Value) ? -1 : -Convert.ToInt32(vector.Groups["Step"].Value);
 
-                // Expand vector
+                // For each bit in the step
                 for (int i = leftBound; i >= rightBound; i += step)
                 {
-                    expansion.Add(String.Concat(name, i));
+                    // Add bit to expansion
+                    expansion.Add(string.Concat(name, i));
                 }
             }
 
-            // Save expansion
+            // If expansion hasn't been done before
             if (!ExpansionMemo.ContainsKey(vector.Value))
             {
+                // Save expansion value in expansion memo
                 ExpansionMemo.Add(vector.Value, expansion);
             }
 
@@ -942,60 +1414,77 @@ namespace VisiBoole.ParsingEngine
         /// <returns>List of constant bits</returns>
         protected List<string> ExpandConstant(Match constant)
         {
+            // Create expansion return list
             List<string> expansion = new List<string>();
+            // Init output binary string
             string outputBinary;
-            char[] charBits; // Converted binary bits as chars
+            // Init char bits
+            char[] charBits;
 
-            // Get binary bits from format type
+            // If constant format is hex
             if (constant.Groups["Format"].Value == "h" || constant.Groups["Format"].Value == "H")
             {
+                // Get output binary in hex format
                 outputBinary = Convert.ToString(Convert.ToInt32(constant.Groups["Value"].Value, 16), 2);
+                // Convert binary to char bits
                 charBits = outputBinary.ToCharArray();
             }
+            // If constant format is decimal
             else if (constant.Groups["Format"].Value == "d" || constant.Groups["Format"].Value == "D")
             {
+                // Get output binary in decimal format
                 outputBinary = Convert.ToString(Convert.ToInt32(constant.Groups["Value"].Value, 10), 2);
+                // Convert binary to char bits
                 charBits = outputBinary.ToCharArray();
             }
+            // If constant format is binary
             else if (constant.Groups["Format"].Value == "b" || constant.Groups["Format"].Value == "B")
             {
+                // Convert binary to char bits
                 charBits = constant.Groups["Value"].Value.ToCharArray();
             }
+            // If no constant format is specified
             else
             {
+                // Get output binary in decimal format
                 outputBinary = Convert.ToString(Convert.ToInt32(constant.Groups["Value"].Value, 10), 2);
+                // Convert binary to char bits
                 charBits = outputBinary.ToCharArray();
             }
 
-            int[] bits = Array.ConvertAll(charBits, bit => (int)Char.GetNumericValue(bit));
-            int specifiedBitCount = String.IsNullOrEmpty(constant.Groups["BitCount"].Value)
-                ? -1
+            // Get binary bits
+            int[] bits = Array.ConvertAll(charBits, bit => (int)char.GetNumericValue(bit));
+            // Get bit count
+            int bitCount = String.IsNullOrEmpty(constant.Groups["BitCount"].Value)
+                ? bits.Length
                 : Convert.ToInt32(constant.Groups["BitCount"].Value);
 
-            if (specifiedBitCount != -1 && specifiedBitCount < bits.Length)
+            // If padding is necessary
+            if (bitCount > bits.Length)
             {
-                // Error
-                ErrorLog.Add($"{LineNumber}: {constant.Value} doesn't specify enough bits.");
-                return null;
-            }
-            else if (specifiedBitCount > bits.Length)
-            {
-                // Add padding
-                for (int i = 0; i < specifiedBitCount - bits.Length; i++)
+                // Get padding count
+                int padding = bitCount - bits.Length;
+                // For each padding
+                for (int i = 0; i < padding; i++)
                 {
+                    // Add padding of 0
                     expansion.Add("0");
                 }
+                // Remove padding count from bit count
+                bitCount -= padding;
             }
 
-            // Add bits to expansion
-            foreach (int bit in bits)
+            // For each specified bit
+            for (int i = bits.Length - bitCount; i < bits.Length; i++)
             {
-                expansion.Add(bit.ToString());
+                // Add bit to expansion
+                expansion.Add(bits[i].ToString());
             }
 
-            // Save expansion
+            // If expansion hasn't been done before
             if (!ExpansionMemo.ContainsKey(constant.Value))
             {
+                // Save expansion value in expansion memo
                 ExpansionMemo.Add(constant.Value, expansion);
             }
 
