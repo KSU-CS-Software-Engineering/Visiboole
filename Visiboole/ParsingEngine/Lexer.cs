@@ -64,7 +64,7 @@ namespace VisiBoole.ParsingEngine
             public TokenType Type { get; private set; }
 
             public string Text { get; private set; }
-            
+
             public int Index { get; private set; }
 
             public Token(string text, TokenType type, int index)
@@ -523,7 +523,7 @@ namespace VisiBoole.ParsingEngine
             for (int i = 0; i < tokens.Count; i++)
             {
                 Token token = tokens[i];
-                List<Token> previousTokens = i != 0 ? tokens.GetRange(0, i): new List<Token>();
+                List<Token> previousTokens = i != 0 ? tokens.GetRange(0, i) : new List<Token>();
 
                 if (token.Type == TokenType.Newline)
                 {
@@ -926,7 +926,7 @@ namespace VisiBoole.ParsingEngine
                 int leftBound = string.IsNullOrEmpty(vectorMatch.Groups["LeftBound"].Value) ? -1 : Convert.ToInt32(vectorMatch.Groups["LeftBound"].Value);
                 int step = string.IsNullOrEmpty(vectorMatch.Groups["Step"].Value) ? -1 : Convert.ToInt32(vectorMatch.Groups["Step"].Value);
                 int rightBound = string.IsNullOrEmpty(vectorMatch.Groups["RightBound"].Value) ? -1 : Convert.ToInt32(vectorMatch.Groups["RightBound"].Value);
-                
+
                 // If left bound or right bound is greater than 31
                 if (leftBound > 31 || rightBound > 31)
                 {
@@ -1237,9 +1237,54 @@ namespace VisiBoole.ParsingEngine
         private bool ValidateParentheses(List<Token> tokens)
         {
             // Remove embedded parenthesis
-            if (tokens.Any(t => t.Type == TokenType.OpenParenthesis))
+            int parenthesesCount = tokens.Count(t => t.Type == TokenType.OpenParenthesis);
+            for (int i = 1; i < parenthesesCount; i++)
             {
+                // Start last open parenthesis index
+                int lastOpenParenthesisIndex = -1;
+                // Find last open parenthesis index
+                for (int j = 0; j < tokens.Count; j++)
+                {
+                    if (tokens[j].Type == TokenType.OpenParenthesis)
+                    {
+                        lastOpenParenthesisIndex = j;
+                    }
+                }
 
+                // Start matching closing parenthesis index
+                int matchingCloseParenthesisIndex = -1;
+                // Find matching closing parenthesis
+                for (int j = lastOpenParenthesisIndex; j < tokens.Count; j++)
+                {
+                    if (tokens[j].Type == TokenType.CloseParenthesis)
+                    {
+                        matchingCloseParenthesisIndex = j;
+                        break;
+                    }
+                }
+
+                // Remove everthing inside parentheses
+                for (int j = lastOpenParenthesisIndex; j <= matchingCloseParenthesisIndex; j++)
+                {
+                    tokens.RemoveAt(j);
+                }
+                tokens.Insert(lastOpenParenthesisIndex, new Token("()", TokenType.Scalar, -1));
+            }
+
+
+
+            List<string> expressionOperators = new List<string>();
+            List<string> expressionExclusiveOperators = new List<string>();
+            for (int i = 1; i < tokens.Count - 1; i++)
+            {
+                Token currentToken = tokens[i];
+                Token previousToken = i != 1 ? tokens[i - 1] : null;
+                Token nextToken = i != tokens.Count - 2 ? tokens[i + 1] : null;
+
+                if (currentToken.Type == TokenType.MathOperator || currentToken.Type == TokenType.BooleanOperator)
+                {
+
+                }
             }
         }
 
