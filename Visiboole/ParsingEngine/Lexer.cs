@@ -43,6 +43,7 @@ namespace VisiBoole.ParsingEngine
             Assignment,
             Clock,
             NegationOperator,
+            ExclusiveBooleanOperator,
             BooleanOperator,
             MathOperator,
             Formatter,
@@ -302,9 +303,13 @@ namespace VisiBoole.ParsingEngine
             }
             else if (OperatorRegex.IsMatch(lexeme))
             {
-                if (lexeme == "|" || lexeme == "^" || lexeme == "==")
+                if (lexeme == "|")
                 {
                     return TokenType.BooleanOperator;
+                }
+                else if (lexeme == "^" || lexeme == "==")
+                {
+                    return TokenType.ExclusiveBooleanOperator;
                 }
                 else if (lexeme.Contains('~'))
                 {
@@ -709,7 +714,7 @@ namespace VisiBoole.ParsingEngine
                         return null;
                     }
                 }
-                else if (token.Type == TokenType.BooleanOperator || token.Type == TokenType.NegationOperator || token.Type == TokenType.MathOperator)
+                else if (token.Type == TokenType.BooleanOperator || token.Type == TokenType.ExclusiveBooleanOperator || token.Type == TokenType.NegationOperator || token.Type == TokenType.MathOperator)
                 {
                     if (insideConcat)
                     {
@@ -723,7 +728,7 @@ namespace VisiBoole.ParsingEngine
                         return null;
                     }
 
-                    if (token.Type == TokenType.BooleanOperator || token.Type == TokenType.NegationOperator)
+                    if (token.Type == TokenType.BooleanOperator || token.Type == TokenType.ExclusiveBooleanOperator || token.Type == TokenType.NegationOperator)
                     {
                         if (tokens.Any(t => t.Type == TokenType.MathOperator))
                         {
@@ -739,7 +744,7 @@ namespace VisiBoole.ParsingEngine
                     }
                     else
                     {
-                        if (tokens.Any(t => token.Type == TokenType.BooleanOperator || token.Type == TokenType.NegationOperator))
+                        if (tokens.Any(t => token.Type == TokenType.BooleanOperator || token.Type == TokenType.ExclusiveBooleanOperator || token.Type == TokenType.NegationOperator))
                         {
                             ErrorLog.Add($"{LineNumber}: Math operators (+ and -) cannot be used with boolean operators in a boolean or clock statement.");
                             return null;
@@ -1280,10 +1285,75 @@ namespace VisiBoole.ParsingEngine
                 Token currentToken = tokens[i];
                 Token previousToken = i != 1 ? tokens[i - 1] : null;
                 Token nextToken = i != tokens.Count - 2 ? tokens[i + 1] : null;
+                bool isOperator = true;
 
-                if (currentToken.Type == TokenType.MathOperator || currentToken.Type == TokenType.BooleanOperator)
+                if (currentToken.Type == TokenType.MathOperator || currentToken.Type == TokenType.BooleanOperator || currentToken.Type == TokenType.ExclusiveBooleanOperator)
                 {
+                    if (previousToken == null || (previousToken.Type != TokenType.Scalar
+                        && previousToken.Type != TokenType.Vector
+                        && previousToken.Type != TokenType.Constant
+                        && previousToken.Type != TokenType.CloseBrace))
+                    {
 
+                        return false;
+                    }
+
+                    if (nextToken == null || (nextToken.Type != TokenType.Scalar
+                        && nextToken.Type != TokenType.Vector
+                        && nextToken.Type != TokenType.Constant
+                        && nextToken.Type != TokenType.OpenBrace))
+                    {
+
+                        return false;
+                    }
+
+                    // If there is an exclusive operator
+                    if (expressionExclusiveOperators.Count > 0)
+                    {
+                        // If the new operator is not matching
+                        if (!expressionExclusiveOperators.Contains(currentToken.Text))
+                        {
+                            // Return error
+                            return false;
+                        }
+                    }
+                    // If the new operator is an exclusive operator
+                    else if (currentToken.Type == TokenType.ExclusiveBooleanOperator || currentToken.Type == TokenType.MathOperator)
+                    {
+                        if (currentToken.Type == TokenType.MathOperator)
+                        {
+                            if (expressionOperators.Count > 0 && expressionOperators.Any(o => o != "+" && o != "-"))
+                            {
+                                return false;
+                            }
+
+                            if (!expressionExclusiveOperators.Contains("+"))
+                            {
+                                expressionExclusiveOperators.Add("+");
+                            }
+                            if (!expressionExclusiveOperators.Contains("-"))
+                            {
+                                expressionExclusiveOperators.Add("-");
+                            }
+                        }
+                        else
+                        {
+                            if (expressionOperators.Count > 0 && expressionOperators.Any(o => o != currentToken.Text))
+                            {
+                                return false;
+                            }
+
+                            if (!expressionExclusiveOperators.Contains(currentToken.Text))
+                            {
+                                expressionExclusiveOperators.Add(currentToken.Text);
+                            }
+                        }
+                    }
+
+                    if (!expressionOperators.Contains(currentToken.Text))
+                    {
+                        expressionOperators.Add(currentToken.Text);
+                    }
                 }
             }
         }
