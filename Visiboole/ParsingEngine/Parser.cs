@@ -505,8 +505,9 @@ namespace VisiBoole.ParsingEngine
         /// </summary>
         /// <param name="streamReader">Stream reader that contains the lines</param>
         /// <returns>String enumerable containing the lines from the stream reader</returns>
-        private IEnumerable<string> ReadLines(StreamReader streamReader)
+        private List<string> ReadLines(StreamReader streamReader)
         {
+            List<string> lines = new List<string>();
             List<char> chars = new List<char>();
             bool buildingLine = true;
             while (!streamReader.EndOfStream)
@@ -521,7 +522,7 @@ namespace VisiBoole.ParsingEngine
                 if (c == ';')
                 {
                     buildingLine = false;
-                    yield return new string(chars.ToArray());
+                    lines.Add(new string(chars.ToArray()));
                     chars.Clear();
                 }
                 else if (c == '\n')
@@ -535,12 +536,13 @@ namespace VisiBoole.ParsingEngine
                         string currentLine = new string(chars.ToArray());
                         if (string.IsNullOrWhiteSpace(currentLine))
                         {
-                            yield return currentLine;
+                            lines.Add(currentLine);
                             chars.Clear();
                         }
                     }
                 }
             }
+            return lines;
         }
 
         /// <summary>
@@ -548,12 +550,13 @@ namespace VisiBoole.ParsingEngine
         /// </summary>
         /// <param name="sourceCode">Source code</param>
         /// <returns>List of expanded source if operations were successful</returns>
-        private List<SourceCode> GetExpandedSourceCode(IEnumerable<string> sourceCode)
+        private List<SourceCode> GetExpandedSourceCode(List<string> sourceCode)
         {
             // Create expanded source code list to return
             List<SourceCode> expandedSourceCode = new List<SourceCode>();
+            List<SourceCode> tempSourceCode = new List<SourceCode>();
             // Create valid bool
-            bool valid = false;
+            bool valid = true;
             // Start module declaration string
             Design.ModuleDeclaration = null;
             // Start line number counter
@@ -625,6 +628,11 @@ namespace VisiBoole.ParsingEngine
                         }
                     }
                 }
+
+                if (valid)
+                {
+                    tempSourceCode.Add(new SourceCode(source, (StatementType)type));
+                }
             }
 
             // If not valid
@@ -636,12 +644,12 @@ namespace VisiBoole.ParsingEngine
             // Reset line number
             LineNumber = 0;
             // For each source in the source code
-            foreach (string source in sourceCode)
+            foreach (SourceCode tempSource in tempSourceCode)
             {
                 // Increment line number counter
                 LineNumber++;
                 // Get expanded source from the source
-                string expandedSource = ExpandSource(source.Replace("**", "").Replace("~~", ""));
+                string expandedSource = ExpandSource(tempSource.Text.Replace("**", "").Replace("~~", ""));
                 // If expanded source is null
                 if (expandedSource == null)
                 {
@@ -661,21 +669,24 @@ namespace VisiBoole.ParsingEngine
                     // For each line in the expanded source
                     foreach (string line in expandedSource.Split(';'))
                     {
-                        bool needsInit = type != StatementType.Comment && type != StatementType.Empty && type != StatementType.Library;
+                        if (line != "")
+                        {
+                            bool needsInit = tempSource.Type != StatementType.Comment && tempSource.Type != StatementType.Empty && tempSource.Type != StatementType.Library;
 
-                        // If source needs to be initialized and unable to init line
-                        if (needsInit && !InitSource(line, type))
-                        {
-                            // Set valid to false
-                            valid = false;
-                            // End expanded source iterations
-                            break;
-                        }
-                        // If able to init line
-                        else
-                        {
-                            // Add line to expanded source code list
-                            expandedSourceCode.Add(new SourceCode(line, (StatementType)type));
+                            // If source needs to be initialized and unable to init line
+                            if (needsInit && !InitSource(line, tempSource.Type))
+                            {
+                                // Set valid to false
+                                valid = false;
+                                // End expanded source iterations
+                                break;
+                            }
+                            // If able to init line
+                            else
+                            {
+                                // Add line to expanded source code list
+                                expandedSourceCode.Add(new SourceCode(line, tempSource.Type));
+                            }
                         }
                     }
                 }
@@ -697,7 +708,6 @@ namespace VisiBoole.ParsingEngine
         private List<Statement> ParseStatements()
         {
             List<Statement> statements = new List<Statement>();
-            bool valid = true;
             byte[] bytes = Encoding.UTF8.GetBytes(Design.Text);
             MemoryStream stream = new MemoryStream(bytes);
             using (StreamReader reader = new StreamReader(stream))
@@ -764,146 +774,13 @@ namespace VisiBoole.ParsingEngine
                 }
             }
 
-            // If valid return statement list
-            // Otherwise return null
-            return valid ? statements : null;
+            // Return statement list
+            return statements;
         }
 
         #endregion
 
         #region Statement Verifications
-
-        /// <summary>
-        /// Verifies an expression statement
-        /// </summary>
-        /// <param name="expression">Expression to verify</param>
-        /// <returns>Whether the expression is valid or not</returns>
-        private bool VerifyExpressionStatement(string expression)
-        {
-            bool wasPreviousOperator = true;
-            bool mathematicalExpression = false;
-            List<StringBuilder> expressions = new List<StringBuilder>();
-            List<List<string>> expressionOperators = new List<List<string>>();
-            List<string> expressionExclusiveOperators = new List<string>();
-
-            // matches contains:
-            // Name: ([_a-zA-Z]\w{0,19})
-            // Operators (~, ^, (, ), |, +, -): ([~^()|+-])
-            // Equal To Operator: (==)
-            // And Operator: ((?<=[\w)}])\s+(?=[\w({~'])(?![^{}]*\}))
-            MatchCollection matches = Regex.Matches(expression, @"([_a-zA-Z]\w{0,19})|(\d+)|([~^()|+-])|(==)|((?<=[\w)}])\s+(?=[\w({~'])(?![^{}]*\}))");
-            string token = "";
-            foreach (Match match in matches)
-            {
-                token = match.Value;
-                if (token == "(")
-                {
-                    // Add new level
-                    if (expressions.Count > 0)
-                    {
-                        expressions[expressions.Count - 1].Append("(");
-                    }
-                    expressions.Add(new StringBuilder());
-                    expressionOperators.Add(new List<string>());
-                    expressionExclusiveOperators.Add("");
-                    wasPreviousOperator = true;
-                }
-                else if (token == ")")
-                {
-                    string innerExpression = expressions[expressions.Count - 1].ToString();
-
-                    if (innerExpression.Length == 0)
-                    {
-                        ErrorLog.Add($"{LineNumber}: Empty ().");
-                        return false;
-                    }
-
-                    // Remove previous level
-                    expressions.RemoveAt(expressions.Count - 1);
-                    expressionOperators.RemoveAt(expressionOperators.Count - 1);
-                    expressionExclusiveOperators.RemoveAt(expressionExclusiveOperators.Count - 1);
-                    if (expressions.Count > 0)
-                    {
-                        expressions[expressions.Count - 1].Append(")");
-                    }
-                    wasPreviousOperator = false;
-                }
-                else if (OperatorsList.Contains(token) || String.IsNullOrWhiteSpace(token))
-                {
-                    // Check operator for possible errors
-                    if (wasPreviousOperator && token != "~")
-                    {
-                        ErrorLog.Add($"{LineNumber}: An operator is missing its operands.");
-                        return false;
-                    }
-
-                    // Check operator and mathematical expression status for error
-                    if (mathematicalExpression && !(token == "+" || token == "-"))
-                    {
-                        ErrorLog.Add($"{LineNumber}: '+' and '-' can't appear with boolean operators.");
-                        return false;
-                    }
-
-                    // Check for mathematical expression
-                    if (!mathematicalExpression && (token == "+" || token == "-"))
-                    {
-                        mathematicalExpression = true;
-                    }
-
-                    // Check exclusive operator for errors
-                    if (!mathematicalExpression)
-                    {
-                        string exclusiveOperator = expressionExclusiveOperators[expressionExclusiveOperators.Count - 1];
-                        if (exclusiveOperator == "")
-                        {
-                            // Currently no exclusive operator, check to add one
-                            if (ExclusiveOperatorsList.Contains(token))
-                            {
-                                List<string> pastOperators = expressionOperators[expressionOperators.Count - 1];
-
-                                // Check previous operators
-                                if (token == "^")
-                                {
-                                    pastOperators = pastOperators.Where(o => o != "^").ToList();
-                                }
-                                else if (token == "==")
-                                {
-                                    pastOperators = pastOperators.Where(o => o != "==").ToList();
-                                }
-
-                                if (pastOperators.Count > 0)
-                                {
-                                    ErrorLog.Add($"{LineNumber}: '{token}' must be the only operator in its parentheses level.");
-                                    return false;
-                                }
-
-                                expressionExclusiveOperators[expressionExclusiveOperators.Count - 1] = token;
-                            }
-                        }
-                        else
-                        {
-                            if (token != exclusiveOperator)
-                            {
-                                ErrorLog.Add($"{LineNumber}: '{exclusiveOperator}' must be the only operator in its parentheses level.");
-                                return false;
-                            }
-                        }
-                    }
-
-                    expressions[expressions.Count - 1].Append(token);
-                    expressionOperators[expressionOperators.Count - 1].Add(token);
-                    wasPreviousOperator = true;
-                }
-                else
-                {
-                    // Append non operator to current parentheses level
-                    expressions[expressions.Count - 1].Append(token);
-                    wasPreviousOperator = false;
-                }
-            }
-
-            return true;
-        }
 
         /// <summary>
         /// Verifies a library statement

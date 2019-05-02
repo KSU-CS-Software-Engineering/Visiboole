@@ -37,6 +37,8 @@ namespace VisiBoole.ParsingEngine
 
         private enum TokenType
         {
+            Comment,
+            Library,
             Scalar,
             Vector,
             Constant,
@@ -66,13 +68,10 @@ namespace VisiBoole.ParsingEngine
 
             public string Text { get; private set; }
 
-            public int Index { get; private set; }
-
-            public Token(string text, TokenType type, int index)
+            public Token(string text, TokenType type)
             {
                 Text = text;
                 Type = type;
-                Index = index;
             }
         }
 
@@ -186,7 +185,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Pattern for identifying invalid characters.
         /// </summary>
-        private static readonly string InvalidPattern = @"[^\s_a-zA-Z0-9~@%^*()=+[\]{}<|:;',.-]";
+        private static readonly string InvalidPattern = @"[^\s_a-zA-Z0-9~@%^*()=#+[\]{}<|:;',.-]";
 
         /// <summary>
         /// Regex for identifying scalars. (Optional ~ or *)
@@ -340,6 +339,10 @@ namespace VisiBoole.ParsingEngine
             {
                 return TokenType.Instantiation;
             }
+            else if (lexeme == "#library")
+            {
+                return TokenType.Library;
+            }
             else
             {
                 return null;
@@ -355,10 +358,12 @@ namespace VisiBoole.ParsingEngine
         {
             // Create tokens list
             List<Token> tokens = new List<Token>();
+            // Create bool for whether iteration is inside a comment
+            bool insideComment = false;
+            // Create bool for whether iteration is inside a library
+            bool insideLibrary = false;
             // Create string builder for current lexeme
             StringBuilder lexeme = new StringBuilder();
-            // Index of lexeme
-            int lexemeIndex = 0;
             // Create groupings stack
             Stack<char> groupings = new Stack<char>();
             // Save current line number
@@ -373,8 +378,39 @@ namespace VisiBoole.ParsingEngine
                 // Get current lexme
                 string currentLexeme = lexeme.ToString();
 
+                if (insideComment || insideLibrary)
+                {
+                    lexeme.Append(c);
+                }
+                else if (c == '"')
+                {
+                    // Make sure current lexeme is empty, + or -
+                    if (!(currentLexeme == "+" || currentLexeme == "-" || currentLexeme == ""))
+                    {
+                        ErrorLog.Add($"Line {LineNumber}: Invalid '\"'.");
+                        return null;
+                    }
+
+                    // Make sure no other tokens exist
+                    if (tokens.Any(t => t.Type != TokenType.Whitespace && t.Type != TokenType.Newline))
+                    {
+                        ErrorLog.Add($"Line {LineNumber}: Invalid '\"'.");
+                        return null;
+                    }
+
+                    if (insideComment)
+                    {
+                        tokens.Add(new Token(currentLexeme, TokenType.Comment));
+                        insideComment = false;
+                    }
+                    else
+                    {
+                        lexeme.Append(c);
+                        insideComment = true;
+                    }
+                }
                 // If the character is an invalid character
-                if (InvalidRegex.IsMatch(newChar))
+                else if (InvalidRegex.IsMatch(newChar))
                 {
                     // Add invalid character error to error log
                     ErrorLog.Add($"{lineNumber}: Invalid character '{c}'.");
@@ -391,21 +427,25 @@ namespace VisiBoole.ParsingEngine
                         {
                             return null;
                         }
+                        if (tokenType == TokenType.Library)
+                        {
+                            insideLibrary = true;
+                        }
 
                         // Add current token to tokens list
-                        tokens.Add(new Token(currentLexeme, (TokenType)tokenType, lexemeIndex));
+                        tokens.Add(new Token(currentLexeme, (TokenType)tokenType));
                         // Clear current lexeme
                         lexeme = lexeme.Clear();
                     }
 
                     if (c == ' ')
                     {
-                        tokens.Add(new Token(newChar, TokenType.Whitespace, i));
+                        tokens.Add(new Token(newChar, TokenType.Whitespace));
                     }
                     else if (c == '\n')
                     {
                         lineNumber++;
-                        tokens.Add(new Token(newChar, TokenType.Newline, i));
+                        tokens.Add(new Token(newChar, TokenType.Newline));
                     }
                     else if (c == ';')
                     {
@@ -415,15 +455,15 @@ namespace VisiBoole.ParsingEngine
                             return null;
                         }
 
-                        tokens.Add(new Token(newChar, TokenType.Semicolon, i));
+                        tokens.Add(new Token(newChar, TokenType.Semicolon));
                     }
                     else if (c == ':')
                     {
-                        tokens.Add(new Token(newChar, TokenType.Colon, i));
+                        tokens.Add(new Token(newChar, TokenType.Colon));
                     }
                     else if (c == ',')
                     {
-                        tokens.Add(new Token(newChar, TokenType.Comma, i));
+                        tokens.Add(new Token(newChar, TokenType.Comma));
                     }
                     else if (c == '(' || c == '{')
                     {
@@ -444,11 +484,11 @@ namespace VisiBoole.ParsingEngine
 
                         if (c == '(')
                         {
-                            tokens.Add(new Token(newChar, TokenType.OpenParenthesis, i));
+                            tokens.Add(new Token(newChar, TokenType.OpenParenthesis));
                         }
                         else
                         {
-                            tokens.Add(new Token(newChar, TokenType.OpenBrace, i));
+                            tokens.Add(new Token(newChar, TokenType.OpenBrace));
                         }
                         groupings.Push(c);
                     }
@@ -472,16 +512,13 @@ namespace VisiBoole.ParsingEngine
 
                         if (c == ')')
                         {
-                            tokens.Add(new Token(newChar, TokenType.CloseParenthesis, i));
+                            tokens.Add(new Token(newChar, TokenType.CloseParenthesis));
                         }
                         else
                         {
-                            tokens.Add(new Token(newChar, TokenType.CloseBrace, i));
+                            tokens.Add(new Token(newChar, TokenType.CloseBrace));
                         }
                     }
-
-                    // Advance lexeme index
-                    lexemeIndex = i + 1;
                 }
                 // If the character is not a seperator character
                 else
@@ -544,7 +581,7 @@ namespace VisiBoole.ParsingEngine
                     }
 
                     insideModule = lastToken != null && (lastToken.Type == TokenType.Declaration || lastToken.Type == TokenType.Instantiation);
-                    openParenthesesIndexes.Push(token.Index);
+                    openParenthesesIndexes.Push(i);
                 }
                 else if (token.Type == TokenType.CloseParenthesis)
                 {
@@ -554,9 +591,19 @@ namespace VisiBoole.ParsingEngine
                         return null;
                     }
 
-                    insideModule = false;
-                    // Check parenthesis
+                    if (lastToken != null && lastToken.Type == TokenType.OpenParenthesis)
+                    {
+                        ErrorLog.Add($"{LineNumber}: Empty ().");
+                        return null;
+                    }
 
+                    insideModule = false;
+                    int openParenthesisIndex = openParenthesesIndexes.Pop();
+                    // Check parenthesis
+                    if ((statementType == StatementType.Boolean || statementType == StatementType.Clock) && !ValidateParentheses(tokens.GetRange(openParenthesisIndex + 1, i - openParenthesisIndex - 1)))
+                    {
+                        return null;
+                    }
                 }
                 else if (token.Type == TokenType.OpenBrace)
                 {
@@ -675,7 +722,7 @@ namespace VisiBoole.ParsingEngine
 
                     if (token.Type != TokenType.Constant && !variables.Any(v => v.Text == token.Text))
                     {
-                        variables.Add(new VariableToken(token.Text, insideConcat));
+                        variables.Add(new VariableToken(token.Text.TrimStart('*').TrimStart('~'), insideConcat));
                     }
                 }
                 else if (token.Type == TokenType.Assignment || token.Type == TokenType.Clock)
@@ -794,48 +841,6 @@ namespace VisiBoole.ParsingEngine
         }
 
         #region Token Verifications
-
-        /// <summary>
-        /// Returns whether the provided lexeme is a recognized token.
-        /// </summary>
-        /// <param name="lexeme">Lexeme to interpret</param>
-        /// <param name="seperatorChar">Character seperator</param>
-        /// <returns>Whether the provided lexeme is a token</returns>
-        private bool IsToken(string lexeme, char seperatorChar)
-        {
-            if (lexeme == Design.FileName && seperatorChar == '(')
-            {
-                return true;
-            }
-            else if (IsScalar(lexeme))
-            {
-                return true;
-            }
-            else if (IsVector(lexeme))
-            {
-                return true;
-            }
-            else if (OperatorRegex.IsMatch(lexeme))
-            {
-                return true;
-            }
-            else if (IsConstant(lexeme))
-            {
-                return true;
-            }
-            else if (FormatterRegex.IsMatch(lexeme))
-            {
-                return true;
-            }
-            else if (InstantiationRegex.IsMatch(lexeme) && seperatorChar == '(')
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
 
         /// <summary>
         /// Returns whether a lexeme is a scalar.
@@ -1026,224 +1031,27 @@ namespace VisiBoole.ParsingEngine
 
         #region Token Validation
 
-        /// <summary>
-        /// Validates the provided token with the current character, statement type and the grouping stack.
-        /// </summary>
-        /// <param name="line">Current line</param>
-        /// <param name="currentChar">Character being appended to the current lexeme</param>
-        /// <param name="currentLexeme">Current lexeme</param>
-        /// <param name="type">Statement type of the line</param>
-        /// <param name="groupings">Groupings stack</param>
-        /// <returns>Whether the token is validate in its current context</returns>
-        private bool ValidateCurrentToken(string line, char currentChar, string currentLexeme, ref StatementType? type, Stack<char> groupings)
+        private bool IsLeftTokenOperand(Token token)
         {
-            // Check for invalid tokens with current statement type
-            if (currentLexeme == "=")
-            {
-                if (type != null)
-                {
-                    ErrorLog.Add($"{LineNumber}: '{currentLexeme}' can only be used after the dependent in a boolean statement.");
-                    return false;
-                }
-                else
-                {
-                    type = StatementType.Boolean;
-                }
-
-                if (line.Substring(0, line.IndexOf(currentLexeme)).Contains("*"))
-                {
-                    ErrorLog.Add($"{LineNumber}: '*' can only be used in a variable list statement.");
-                    return false;
-                }
-
-                if (line.Substring(0, line.IndexOf(currentLexeme)).Contains("'"))
-                {
-                    ErrorLog.Add($"{LineNumber}: Constants can't be used on the left side of a boolean statement.");
-                    return false;
-                }
-            }
-            else if (currentLexeme.Contains("<="))
-            {
-                if (type != null)
-                {
-                    ErrorLog.Add($"{LineNumber}: '{currentLexeme}' can only be used after the dependent in a clock statement.");
-                    return false;
-                }
-                else
-                {
-                    type = StatementType.Clock;
-                }
-
-                if (line.Substring(0, line.IndexOf(currentLexeme)).Contains("*"))
-                {
-                    ErrorLog.Add($"{LineNumber}: '*' can only be used in a variable list statement.");
-                    return false;
-                }
-
-                if (line.Substring(0, line.IndexOf(currentLexeme)).Contains("'"))
-                {
-                    ErrorLog.Add($"{LineNumber}: Constants can't be used on the left side of a clock statement.");
-                    return false;
-                }
-            }
-            else if (Regex.IsMatch(currentLexeme, @"^([+|^-])|(==)$"))
-            {
-                if (!(type == StatementType.Boolean || type == StatementType.Clock))
-                {
-                    ErrorLog.Add($"{LineNumber}: '{currentLexeme}' operator can only be used in a boolean or clock statement.");
-                    return false;
-                }
-            }
-            else if (currentLexeme.Contains("%"))
-            {
-                if (type != null && type != StatementType.FormatSpecifier)
-                {
-                    ErrorLog.Add($"{LineNumber}: '{currentLexeme}' can only be used in a format specifier statement.");
-                    return false;
-                }
-                else if (type == null)
-                {
-                    type = StatementType.FormatSpecifier;
-                }
-            }
-            else if (currentLexeme.Contains("~"))
-            {
-                if (currentLexeme == "~" && currentChar != '(' && currentChar != '{')
-                {
-                    ErrorLog.Add($"{LineNumber}: '~' must be attached to a scalar, vector, constant, parenthesis or concatenation.");
-                    return false;
-                }
-
-                if (!(type == StatementType.Boolean || type == StatementType.Clock))
-                {
-                    ErrorLog.Add($"{LineNumber}: '~' can only be used in on the right side of a boolean or clock statement.");
-                    return false;
-                }
-
-                if (groupings.Count > 0 && groupings.Peek() == '{')
-                {
-                    ErrorLog.Add($"{LineNumber}: '~' can't be used inside a concatenation field.");
-                    return false;
-                }
-            }
-            else if (currentLexeme.Contains("*"))
-            {
-                if (type != null)
-                {
-                    ErrorLog.Add($"{LineNumber}: '*' can only be used in a variable list statement.");
-                    return false;
-                }
-            }
-
-            return true;
+            return token.Type == TokenType.Scalar
+                || token.Type == TokenType.Vector
+                || token.Type == TokenType.Constant
+                || token.Type == TokenType.CloseBrace;
         }
 
-        /// <summary>
-        /// Validates the seperator token with the current lexeme, statement type, groupings stack and the previous tokens.
-        /// </summary>
-        /// <param name="line">Current line</param>
-        /// <param name="seperatorChar">Character that is ending the current lexeme</param>
-        /// <param name="currentLexeme">Current lexeme</param>
-        /// <param name="type">Statement type of the line</param>
-        /// <param name="groupings">Groupings stack</param>
-        /// <param name="tokens">Previous tokens</param>
-        /// <returns></returns>
-        private bool ValidateSeperatorToken(string line, char seperatorChar, string currentLexeme, ref StatementType? type, Stack<char> groupings, List<string> tokens)
+        private bool IsRightTokenOperand(Token token)
         {
-            if (seperatorChar == '{' || seperatorChar == '}')
-            {
-                if (seperatorChar == '{' && groupings.Count > 0 && groupings.Peek() == '{')
-                {
-                    ErrorLog.Add($"{LineNumber}: Concatenations can't be used inside of other concatenations.");
-                    return false;
-                }
-            }
-            else if (seperatorChar == '(' || seperatorChar == ')')
-            {
-                if (groupings.Count > 0 && groupings.Peek() == '{')
-                {
-                    ErrorLog.Add($"{LineNumber}: '{seperatorChar}' can't be used in a concatenation.");
-                    return false;
-                }
-
-                if (currentLexeme == Design.FileName)
-                {
-                    type = StatementType.Module;
-                }
-                else if (InstantiationRegex.IsMatch(currentLexeme))
-                {
-                    if (!ValidateInstantiation(InstantiationRegex.Match(currentLexeme), line))
-                    {
-                        return false;
-                    }
-
-                    type = StatementType.Submodule;
-                }
-
-                if (type == StatementType.FormatSpecifier || type == null)
-                {
-                    ErrorLog.Add($"{LineNumber}: '{seperatorChar}' can't be used in a format specifier or variable list statement.");
-                    return false;
-                }
-            }
-            else if (seperatorChar == ';')
-            {
-                if (tokens.Count == 0 || tokens.Contains(";"))
-                {
-                    ErrorLog.Add($"{LineNumber}: ';' can only be used to end a statement.");
-                    return false;
-                }
-            }
-            else if (seperatorChar == ',')
-            {
-                // Check for misplaced comma
-                if (groupings.Count == 0 || groupings.Peek() != '(')
-                {
-                    ErrorLog.Add($"{LineNumber}: ',' can only be used inside the () in a submodule or module statement.");
-                    return false;
-                }
-                else
-                {
-                    if (!(type == StatementType.Submodule || type == StatementType.Module))
-                    {
-                        ErrorLog.Add($"{LineNumber}: ',' can only be used inside the () in a submodule or module statement.");
-                        return false;
-                    }
-                }
-            }
-            else if (seperatorChar == ':')
-            {
-                if (groupings.Count == 0 || groupings.Peek() != '(')
-                {
-                    ErrorLog.Add($"{LineNumber}: ':' can only be used to seperate input and output variables in a module or submodule statement.");
-                    return false;
-                }
-                else
-                {
-                    if (!(type == StatementType.Module || type == StatementType.Submodule))
-                    {
-                        ErrorLog.Add($"{LineNumber}: ':' can only be used to seperate input and output variables in a module or submodule statement.");
-                        return false;
-                    }
-                    else
-                    {
-                        if (tokens.Contains(":"))
-                        {
-                            ErrorLog.Add($"{LineNumber}: ':' can only be used once in a module or submodule statement.");
-                            return false;
-                        }
-                    }
-                }
-            }
-
-            return true;
+            return token.Type == TokenType.Scalar
+                || token.Type == TokenType.Vector
+                || token.Type == TokenType.Constant
+                || token.Type == TokenType.OpenBrace;
         }
 
         private bool ValidateParentheses(List<Token> tokens)
         {
             // Remove embedded parenthesis
             int parenthesesCount = tokens.Count(t => t.Type == TokenType.OpenParenthesis);
-            for (int i = 1; i < parenthesesCount; i++)
+            for (int i = 0; i < parenthesesCount; i++)
             {
                 // Start last open parenthesis index
                 int lastOpenParenthesisIndex = -1;
@@ -1268,15 +1076,13 @@ namespace VisiBoole.ParsingEngine
                     }
                 }
 
-                // Remove everthing inside parentheses
+                // Remove everything inside parentheses
                 for (int j = lastOpenParenthesisIndex; j <= matchingCloseParenthesisIndex; j++)
                 {
                     tokens.RemoveAt(j);
                 }
-                tokens.Insert(lastOpenParenthesisIndex, new Token("()", TokenType.Scalar, -1));
+                tokens.Insert(lastOpenParenthesisIndex, new Token("()", TokenType.Scalar));
             }
-
-
 
             List<string> expressionOperators = new List<string>();
             List<string> expressionExclusiveOperators = new List<string>();
@@ -1285,23 +1091,20 @@ namespace VisiBoole.ParsingEngine
                 Token currentToken = tokens[i];
                 Token previousToken = i != 1 ? tokens[i - 1] : null;
                 Token nextToken = i != tokens.Count - 2 ? tokens[i + 1] : null;
-                bool isOperator = true;
+                bool isOperator = currentToken.Type == TokenType.MathOperator
+                    || currentToken.Type == TokenType.BooleanOperator
+                    || currentToken.Type == TokenType.ExclusiveBooleanOperator
+                    || ((currentToken.Type == TokenType.Whitespace || currentToken.Type == TokenType.Newline) 
+                    && previousToken != null && IsLeftTokenOperand(previousToken) && nextToken != null && IsRightTokenOperand(nextToken));
 
-                if (currentToken.Type == TokenType.MathOperator || currentToken.Type == TokenType.BooleanOperator || currentToken.Type == TokenType.ExclusiveBooleanOperator)
+                if (isOperator)
                 {
-                    if (previousToken == null || (previousToken.Type != TokenType.Scalar
-                        && previousToken.Type != TokenType.Vector
-                        && previousToken.Type != TokenType.Constant
-                        && previousToken.Type != TokenType.CloseBrace))
+                    if (previousToken == null || !IsLeftTokenOperand(previousToken))
                     {
-
                         return false;
                     }
 
-                    if (nextToken == null || (nextToken.Type != TokenType.Scalar
-                        && nextToken.Type != TokenType.Vector
-                        && nextToken.Type != TokenType.Constant
-                        && nextToken.Type != TokenType.OpenBrace))
+                    if (nextToken == null || !IsRightTokenOperand(nextToken))
                     {
 
                         return false;
@@ -1356,6 +1159,8 @@ namespace VisiBoole.ParsingEngine
                     }
                 }
             }
+
+            return true;
         }
 
         /// <summary>
