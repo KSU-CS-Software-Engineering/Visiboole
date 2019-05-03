@@ -42,7 +42,6 @@ namespace VisiBoole.ParsingEngine
             Assignment,
             Clock,
             NegationOperator,
-            AndOperator,
             OrOperator,
             ExclusiveOrOperator,
             EqualToOperator,
@@ -81,12 +80,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Pattern for identifying names.
         /// </summary>
-        private static readonly string NamePattern = @"(?<Name>[a-zA-Z][[a-zA-Z0-9]*(?<!\d))";
-
-        /// <summary>
-        /// Pattern for identifying scalars. (No ~ or *)
-        /// </summary>
-        public static readonly string ScalarPattern = $@"({NamePattern}(?<Bit>\d+)?)";
+        public static readonly string ScalarPattern = @"(?<Name>[a-zA-Z][[a-zA-Z0-9]*)";
 
         /// <summary>
         /// Pattern for identfying indexes.
@@ -96,7 +90,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Pattern for identifying vectors. (No ~ or *)
         /// </summary>
-        protected static readonly string VectorPattern = $@"({NamePattern}{IndexPattern})";
+        protected static readonly string VectorPattern = $@"({ScalarPattern}{IndexPattern})";
 
         /// <summary>
         /// Pattern for identifying binary constants.
@@ -948,7 +942,12 @@ namespace VisiBoole.ParsingEngine
             {
                 // Get scalar name and bit
                 string name = scalarMatch.Groups["Name"].Value;
-                int bit = string.IsNullOrEmpty(scalarMatch.Groups["Bit"].Value) ? -1 : Convert.ToInt32(scalarMatch.Groups["Bit"].Value);
+                string bitString = string.Concat(name.ToArray().Reverse().TakeWhile(char.IsNumber).Reverse());
+                int bit = string.IsNullOrEmpty(bitString) ? -1 : Convert.ToInt32(bitString);
+                if (bit != -1)
+                {
+                    name = name.Substring(0, name.Length - bitString.Length);
+                }
 
                 // If scalar bit is larger than 31
                 if (bit > 31)

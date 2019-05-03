@@ -97,7 +97,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Regex for identifying constants that need to be expanded.
         /// </summary>
-        private static Regex ConstantRegex2 { get; } = new Regex($@"((?<=\W){ConstantPattern})", RegexOptions.Compiled);
+        private static Regex ConstantRegex2 { get; } = new Regex($@"((?<=^|\W){ConstantPattern})", RegexOptions.Compiled);
 
         /// <summary>
         /// Regex for identifying scalars, vectors and constants.
@@ -122,7 +122,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Regex for determining whether expansion is required.
         /// </summary>
-        private static Regex ExpansionRegex { get; } = new Regex($@"((?<!{FormatterPattern}){ConcatPattern})|{VectorPattern}|((?<=\W){ConstantPattern})", RegexOptions.Compiled);
+        private static Regex ExpansionRegex { get; } = new Regex($@"((?<!{FormatterPattern}){ConcatPattern})|{VectorPattern}|((?<=^|\W){ConstantPattern})", RegexOptions.Compiled);
 
         /// <summary>
         /// Regex for identifying comment statements.
@@ -1381,7 +1381,6 @@ namespace VisiBoole.ParsingEngine
             // Expand dependent
             List<string> dependentExpansion = new List<string>();
             Match dependentMatch = AnyTypeRegex.Match(dependent);
-            LineNumber = GetLineNumber(line, dependentMatch.Index);
             if (dependentMatch.Value.Contains("{"))
             {
                 dependentExpansion = GetExpansion(dependentMatch);
