@@ -111,6 +111,8 @@
     <Compile Include="ParsingEngine\Statements\SubmoduleInstantiationStmt.cs" />
     <Compile Include="Models\DatabaseObjects\Variable.cs" />
     <Compile Include="ParsingEngine\Statements\VariableListStmt.cs" />
+    <Compile Include="ParsingEngine\Temp.cs" />
+    <Compile Include="ParsingEngine\Tokenizer.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="Views\ErrorListBox.cs">
       <SubType>Form</SubType>

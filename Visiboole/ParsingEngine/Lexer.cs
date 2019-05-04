@@ -11,70 +11,8 @@ using VisiBoole.Views;
 
 namespace VisiBoole.ParsingEngine
 {
-    public class Lexer
+    public class Lexer : Tokenizer
     {
-        #region Lexer Types
-
-        /// <summary>
-        /// Statement type proposed by the lexer.
-        /// </summary>
-        protected enum StatementType
-        {
-            Boolean,
-            Clock,
-            Comment,
-            Empty,
-            FormatSpecifier,
-            Library,
-            Module,
-            Submodule,
-            VariableList
-        }
-
-        #endregion
-
-        #region Token Class and Types
-
-        private enum TokenType
-        {
-            Variable,
-            Constant,
-            Assignment,
-            Clock,
-            NegationOperator,
-            OrOperator,
-            ExclusiveOrOperator,
-            EqualToOperator,
-            MathOperator,
-            Formatter,
-            Declaration,
-            Instantiation,
-            Whitespace,
-            Newline,
-            Semicolon,
-            Colon,
-            Comma,
-            OpenParenthesis,
-            CloseParenthesis,
-            OpenBrace,
-            CloseBrace
-        }
-
-        private class Token
-        {
-            public TokenType Type { get; private set; }
-
-            public string Text { get; private set; }
-
-            public Token(string text, TokenType type)
-            {
-                Text = text;
-                Type = type;
-            }
-        }
-
-        #endregion
-
         #region Lexer Patterns and Regular Expressions
 
         /// <summary>
@@ -215,11 +153,6 @@ namespace VisiBoole.ParsingEngine
         protected int LineNumber;
 
         /// <summary>
-        /// List of errors.
-        /// </summary>
-        protected List<string> ErrorLog;
-
-        /// <summary>
         /// The design being parsed.
         /// </summary>
         protected Design Design;
@@ -321,6 +254,89 @@ namespace VisiBoole.ParsingEngine
             else
             {
                 return null;
+            }
+        }
+
+        private StatementType? GetStatementType2(string line)
+        {
+            // Statement type to return
+            StatementType? statementType = null;
+            // Create tokens list
+            List<Token> tokens = new List<Token>();
+            // Create string builder for current lexeme
+            StringBuilder lexeme = new StringBuilder();
+            // Create groupings stack
+            Stack<char> groupings = new Stack<char>();
+            // Save current line number
+            int lineNumber = LineNumber;
+
+            for (int i = 0; i < line.Length; i++)
+            {
+                // Get current character
+                char c = line[i];
+                // Get character as a string
+                string newChar = c.ToString();
+                // Get current lexme
+                string currentLexeme = lexeme.ToString();
+
+                if (statementType == StatementType.Comment || statementType == StatementType.Library)
+                {
+                    lexeme.Append(c);
+                }
+                else if (c == '"')
+                {
+                    // Make sure current lexeme is empty, + or -
+                    if (!(currentLexeme == "+" || currentLexeme == "-" || currentLexeme == ""))
+                    {
+                        ErrorLog.Add($"{LineNumber}: Invalid '\"'.");
+                        return null;
+                    }
+
+                    // Make sure no other tokens exist
+                    if (tokens.Any(token => token.Text != " "))
+                    {
+                        ErrorLog.Add($"{LineNumber}: Invalid '\"'.");
+                        return null;
+                    }
+
+                    statementType = StatementType.Comment;
+                    lexeme.Append(c);
+                }
+                else if (currentLexeme == "#library")
+                {
+                    statementType = StatementType.Library;
+                }
+                // If the character is an invalid character
+                else if (InvalidRegex.IsMatch(newChar))
+                {
+                    // Add invalid character error to error log
+                    ErrorLog.Add($"{lineNumber}: Unrecognized character '{c}'.");
+                    // Return null
+                    return null;
+                }
+                // If the character is a seperator character
+                else if (SeperatorRegex.IsMatch(newChar))
+                {
+                    if (currentLexeme.Length > 0)
+                    {
+                        TokenType? tokenType = GetTokenType(currentLexeme, c);
+                        if (tokenType == null)
+                        {
+                            return null;
+                        }
+
+                        // Add current token to tokens list
+                        tokens.Add(new Token(currentLexeme, (TokenType)tokenType));
+                        // Clear current lexeme
+                        lexeme = lexeme.Clear();
+                    }
+                }
+                // If the character is not a seperator character
+                else
+                {
+                    // Append new character to the current lexeme
+                    lexeme.Append(c);
+                }
             }
         }
 
@@ -925,191 +941,6 @@ namespace VisiBoole.ParsingEngine
             // Return statement type
             return statementType;
         }
-
-        #region Token Verifications
-
-        /// <summary>
-        /// Returns whether a lexeme is a scalar.
-        /// </summary>
-        /// <param name="lexeme">Lexeme to interpret</param>
-        /// <returns>Whether the lexeme is a scalar</returns>
-        private bool IsScalar(string lexeme)
-        {
-            // Try to match lexeme as a scalar
-            Match scalarMatch = ScalarRegex.Match(lexeme);
-            // If lexeme is a scalar
-            if (scalarMatch.Success)
-            {
-                // Get scalar name and bit
-                string name = scalarMatch.Groups["Name"].Value;
-                string bitString = string.Concat(name.ToArray().Reverse().TakeWhile(char.IsNumber).Reverse());
-                int bit = string.IsNullOrEmpty(bitString) ? -1 : Convert.ToInt32(bitString);
-                if (bit != -1)
-                {
-                    name = name.Substring(0, name.Length - bitString.Length);
-                }
-
-                // If scalar bit is larger than 31
-                if (bit > 31)
-                {
-                    ErrorLog.Add($"{LineNumber}: Bit count of '{lexeme}' must be between 0 and 31.");
-                    return false;
-                }
-
-                // If scalar doesn't contain a bit
-                if (bit == -1)
-                {
-                    // If namespace belongs to a vector
-                    if (Design.Database.NamespaceBelongsToVector(name))
-                    {
-                        // Add namespace error to error log
-                        ErrorLog.Add($"{LineNumber}: Namespace '{name}' is already being used by a vector.");
-                        return false;
-                    }
-                    // If namespace doesn't exist
-                    else if (!Design.Database.NamespaceExists(name))
-                    {
-                        // Update namespace with no bit
-                        Design.Database.UpdateNamespace(name, bit);
-                    }
-                }
-                // If scalar does contain a bit
-                else
-                {
-                    // If namespace exists and doesn't belong to a vector
-                    if (Design.Database.NamespaceExists(name) && !Design.Database.NamespaceBelongsToVector(name))
-                    {
-                        // Add namespace error to error log
-                        ErrorLog.Add($"{LineNumber}: Namespace '{name}' is already being used by a scalar.");
-                        return false;
-                    }
-                    // If namespace doesn't exist or belongs to a vector
-                    else
-                    {
-                        // Update/add namespace with bit
-                        Design.Database.UpdateNamespace(name, bit);
-                    }
-                }
-
-                return true;
-            }
-            // If lexeme is not a scalar
-            else
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Returns whether a lexeme is a vector. (If so, initializes it)
-        /// </summary>
-        /// <param name="lexeme">Lexeme to interpret</param>
-        /// <returns>Whether the lexeme is a vector</returns>
-        private bool IsVector(string lexeme)
-        {
-            // Try to match lexeme as a vector
-            Match vectorMatch = VectorRegex.Match(lexeme);
-            // If lexeme is a vector
-            if (vectorMatch.Success)
-            {
-                // Get vector name
-                string name = vectorMatch.Groups["Name"].Value;
-
-                // If vector name ends in a number
-                if (char.IsDigit(name[name.Length - 1]))
-                {
-                    // Add vector name error to error log
-                    ErrorLog.Add($"{LineNumber}: Vector name '{name}' cannot end in a number.");
-                    return false;
-                }
-
-                // Get vector bounds and step
-                int leftBound = string.IsNullOrEmpty(vectorMatch.Groups["LeftBound"].Value) ? -1 : Convert.ToInt32(vectorMatch.Groups["LeftBound"].Value);
-                int step = string.IsNullOrEmpty(vectorMatch.Groups["Step"].Value) ? -1 : Convert.ToInt32(vectorMatch.Groups["Step"].Value);
-                int rightBound = string.IsNullOrEmpty(vectorMatch.Groups["RightBound"].Value) ? -1 : Convert.ToInt32(vectorMatch.Groups["RightBound"].Value);
-
-                // If left bound or right bound is greater than 31
-                if (leftBound > 31 || rightBound > 31)
-                {
-                    // Add vector bounds error to error log
-                    ErrorLog.Add($"{LineNumber}: Vector bounds of '{lexeme}' must be between 0 and 31.");
-                    return false;
-                }
-                // If step is not between 1 and 31
-                else if (step == 0 || step > 31)
-                {
-                    // Add vector step error to error log
-                    ErrorLog.Add($"{LineNumber}: Vector step of '{lexeme}' must be between 1 and 31.");
-                    return false;
-                }
-
-                // If namespace exists and doesn't belong to a vector
-                if (Design.Database.NamespaceExists(name) && !Design.Database.NamespaceBelongsToVector(name))
-                {
-                    // Add namespace error to error log
-                    ErrorLog.Add($"{LineNumber}: Namespace '{name}' is already being used by a scalar.");
-                    return false;
-                }
-
-                // If vector is explicit
-                if (leftBound != -1)
-                {
-                    // If left bound is least significant bit
-                    if (leftBound < rightBound)
-                    {
-                        // Flips bounds so left bound is most significant bit
-                        leftBound = leftBound + rightBound;
-                        rightBound = leftBound - rightBound;
-                        leftBound = leftBound - rightBound;
-                    }
-
-                    // For each bit in the vector bounds
-                    for (int i = leftBound; i >= rightBound; i--)
-                    {
-                        // Update/add bit to namespace
-                        Design.Database.UpdateNamespace(name, i);
-                    }
-                }
-
-                return true;
-            }
-            // If lexeme is not a vector
-            else
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Returns whether a lexeme is a constant.
-        /// </summary>
-        /// <param name="lexeme">Lexeme to interpret</param>
-        /// <returns>Whether the lexeme is a constant</returns>
-        private bool IsConstant(string lexeme)
-        {
-            // Try to match lexeme as a constant
-            Match constantMatch = ConstantRegex.Match(lexeme);
-            // If lexeme is a constant
-            if (constantMatch.Success)
-            {
-                // If the provided bit count is greater than 32 bits
-                if (!string.IsNullOrEmpty(constantMatch.Groups["BitCount"].Value) && Convert.ToInt32(constantMatch.Groups["BitCount"].Value) > 32)
-                {
-                    // Add constant bit count error to error log
-                    ErrorLog.Add($"{LineNumber}: Constant '{lexeme}' can    have at most 32 bits.");
-                    return false;
-                }
-
-                return true;
-            }
-            // If lexeme is not a constant
-            else
-            {
-                return false;
-            }
-        }
-
-        #endregion
 
         #region Token Validation
 
