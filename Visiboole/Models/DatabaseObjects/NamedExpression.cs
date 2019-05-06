@@ -23,6 +23,11 @@ namespace VisiBoole.Models
         public string[] Delays { get; private set; }
 
         /// <summary>
+        /// Binary values of the delays.
+        /// </summary>
+        public string DelayBinary { get; private set; }
+
+        /// <summary>
         /// Dependent of the expression.
         /// </summary>
         public string Dependent { get; private set; }
