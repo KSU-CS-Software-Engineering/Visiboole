@@ -48,10 +48,11 @@ namespace VisiBoole.Controllers
         void RetrieveFocus();
 
         /// <summary>
-        /// Selects the file at the specified index.
+        /// Selects the provided file name.
         /// </summary>
-        /// <param name="index">The index of the file</param>
-        void SelectFile(int index);
+        /// <param name="name">Name of file to select</param>
+        /// <param name="updateTabControl">Indicates whether to update the tab control selection</param>
+        void SelectFile(string name, bool updateTabControl = false);
 
         /// <summary>
 		/// Processes a new file that is created or opened by the user

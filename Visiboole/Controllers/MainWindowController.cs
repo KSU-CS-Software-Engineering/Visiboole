@@ -69,15 +69,7 @@ namespace VisiBoole.Controllers
         /// <returns>The display</returns>
         public IDisplay GetDisplay()
         {
-            try
-            {
-                return DisplayController.CurrentDisplay;
-            }
-            catch (Exception)
-            {
-                DialogBox.New("Error", "An unexpected error has occured while retrieving the current display type.", DialogType.Ok);
-                return null;
-            }
+            return DisplayController.CurrentDisplay;
         }
 
         /// <summary>
@@ -86,16 +78,9 @@ namespace VisiBoole.Controllers
         /// <param name="dType">The type of display that should be loaded</param>
         public void LoadDisplay(DisplayType dType)
         {
-            try
-            {
-                DisplayController.PreviousDisplay = DisplayController.CurrentDisplay;
-                DisplayController.CurrentDisplay = DisplayController.GetDisplayOfType(dType);
-                MainWindow.LoadDisplay(DisplayController.PreviousDisplay, DisplayController.CurrentDisplay);
-            }
-            catch (Exception)
-            {
-                DialogBox.New("Error", "An unexpected error has occured while loading the display.", DialogType.Ok);
-            }
+            DisplayController.PreviousDisplay = DisplayController.CurrentDisplay;
+            DisplayController.CurrentDisplay = DisplayController.GetDisplayOfType(dType);
+            MainWindow.LoadDisplay(DisplayController.PreviousDisplay, DisplayController.CurrentDisplay);
         }
 
         /// <summary>
@@ -103,16 +88,9 @@ namespace VisiBoole.Controllers
         /// </summary>
         public void SwitchDisplay()
         {
-            try
+            if (DisplayController.CurrentDisplay is DisplayRun)
             {
-                if (DisplayController.CurrentDisplay is DisplayRun)
-                {
-                    LoadDisplay(DisplayType.EDIT);
-                }
-            }
-            catch (Exception)
-            {
-                DialogBox.New("Error", "An unexpected error has occured while switching the display type.", DialogType.Ok);
+                LoadDisplay(DisplayType.EDIT);
             }
         }
 
@@ -141,13 +119,17 @@ namespace VisiBoole.Controllers
         }
 
         /// <summary>
-        /// Selects the file at the specified index.
+        /// Selects the provided file name.
         /// </summary>
-        /// <param name="index">The index of the file</param>
-        public void SelectFile(int index)
+        /// <param name="name">Name of file to select</param>
+        /// <param name="updateTabControl">Indicates whether to update the tab control selection</param>
+        public void SelectFile(string name, bool updateTabControl = false)
         {
-            string designName = DisplayController.SelectTabPage(index);
-            DesignController.SelectDesign(designName);
+            if (updateTabControl)
+            {
+                DisplayController.SelectTabPage(name);
+            }
+            DesignController.SelectDesign(name);
         }
 
         /// <summary>

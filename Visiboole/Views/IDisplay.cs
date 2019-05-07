@@ -18,6 +18,7 @@
  * If not, see <http://www.gnu.org/licenses/>
  */
 
+using CustomTabControl;
 using System.Windows.Forms;
 using VisiBoole.Controllers;
 
@@ -39,17 +40,34 @@ namespace VisiBoole.Views
 		/// <param name="controller">The handle to the controller to save</param>
 		void AttachController(IDisplayController controller);
 
-		/// <summary>
-		/// Loads the given tabcontrol into this display
+        /// <summary>
+		/// Loads the given tab control into this display.
 		/// </summary>
 		/// <param name="tabControl">The tabcontrol that will be loaded by this display</param>
-		void AddTabControl(TabControl tabControl);
+		void AddTabControl(NewTabControl tabControl);
 
-		/// <summary>
-		/// Loads the given web browser into this display
-		/// </summary>
-        /// <param name="designName">Name of the design represented by the browser</param>
-		/// <param name="browser">The browser that will be loaded by this display</param>
-		void AddBrowser(string designName, WebBrowser browser);
+        /// <summary>
+        /// Selects the tab with the provided name if present.
+        /// </summary>
+        /// <param name="name">Name of tab to select</param>
+        void SelectTab(string name);
+
+        /// <summary>
+        /// Closes the tab with the provided name if present.
+        /// </summary>
+        /// <param name="name"></param>
+        void CloseTab(string name);
+
+        /// <summary>
+        /// Refreshes the tab control in this display.
+        /// </summary>
+        void RefreshTabControl();
+
+        /// <summary>
+        /// Adds/updates a tab page with the provided name and the provided component.
+        /// </summary>
+        /// <param name="name">Name of the tab page to add or update</param>
+        /// <param name="component">Component to add or update</param>
+        void AddTabComponent(string name, object component);
     }
 }

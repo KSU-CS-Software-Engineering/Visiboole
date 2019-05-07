@@ -419,7 +419,7 @@ namespace VisiBoole.ParsingEngine
         /// </summary>
         /// <param name="inputs">Input variables</param>
         /// <returns>Parsed output</returns>
-        public List<IObjectCodeElement> ParseWithInput(List<Variable> inputs)
+        public List<IObjectCodeElement> ParseWithInput(List<Variable> inputs, bool isSubdesign = false)
         {
             // Get statements for parsing
             Design.Database = new Database();
@@ -864,17 +864,11 @@ namespace VisiBoole.ParsingEngine
                     // Add clock statement to statement list
                     statements.Add(new DffClockStmt(source.Text));
                 }
-                // If the source statement type is a variable list statement
-                else if (source.Type == StatementType.VariableList)
-                {
-                    // Add variable list statement to statement list
-                    statements.Add(new VariableListStmt(source.Text));
-                }
                 // If the source statement type is a format specifier statement
-                else if (source.Type == StatementType.FormatSpecifier)
+                else if (source.Type == StatementType.Display)
                 {
                     // Add format specifier statement to statement list
-                    statements.Add(new FormatSpecifierStmt(source.Text));
+                    statements.Add(new DisplayStmt(source.Text));
                 }
                 // If the source statement type is a module statement
                 else if (source.Type == StatementType.Module)

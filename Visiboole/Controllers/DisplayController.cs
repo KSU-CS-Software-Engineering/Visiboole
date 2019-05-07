@@ -33,6 +33,16 @@ using CustomTabControl;
 namespace VisiBoole.Controllers
 {
     /// <summary>
+    /// The different display types for the UserControl displays that are hosted by the MainWindow
+    /// </summary>
+    public enum DisplayType
+    {
+        EDIT,
+        RUN,
+        NONE
+    }
+
+    /// <summary>
     /// Handles the logic, and communication with other objects for the displays hosted by the MainWindow
     /// </summary>
 	[PermissionSet(SecurityAction.Demand, Name = "FullTrust")]
@@ -54,11 +64,6 @@ namespace VisiBoole.Controllers
 		/// </summary>
 		private IMainWindowController MainWindowController;
 
-		/// <summary>
-		/// The TabControl that shows the input that is shared amongst the displays that are hosted by the MainWindow
-		/// </summary>
-		private NewTabControl TabControl;
-
         /// <summary>
         /// HTMLBuilder for the web browser.
         /// </summary>
@@ -78,6 +83,8 @@ namespace VisiBoole.Controllers
         /// Last output of the browser.
         /// </summary>
         private List<IObjectCodeElement> LastOutput;
+
+        private TreeNode InstantiationClicks;
 
         /// <summary>
         /// The display that was hosted by the MainWindow before the current one
@@ -102,7 +109,7 @@ namespace VisiBoole.Controllers
 			{
 				value.AddTabControl(TabControl);
                 string currentDesign = TabControl.SelectedTab != null ? TabControl.SelectedTab.Text.TrimStart('*') : "";
-				value.AddBrowser(currentDesign, Browser);
+				value.AddTabComponent(currentDesign, Browser);
 				currentDisplay = value;
 			}
 		}
@@ -115,33 +122,43 @@ namespace VisiBoole.Controllers
         public DisplayController(IDisplay editDisplay, IDisplay runDisplay)
 		{
             // Init tab control
-			TabControl = new NewTabControl();
-            TabControl.Font = new Font("Segoe UI", 10.75F);
-            TabControl.SelectedTabColor = Color.DodgerBlue;
-            TabControl.TabBoundaryColor = Color.Black;
-            TabControl.SelectedTabTextColor = Color.White;
-
-            TabControl.SelectedIndexChanged += (sender, e) => {
-                MainWindowController.SelectFile(TabControl.SelectedIndex);
+			var designTabControl = new NewTabControl();
+            designTabControl.Font = new Font("Segoe UI", 10.75F);
+            designTabControl.SelectedTabColor = Color.DodgerBlue;
+            designTabControl.TabBoundaryColor = Color.Black;
+            designTabControl.SelectedTabTextColor = Color.White;
+            designTabControl.SelectedIndexChanged += (sender, e) => {
+                string fileSelection = designTabControl.SelectedIndex != -1 ? designTabControl.SelectedTab.Text.TrimStart('*') : null;
+                MainWindowController.SelectFile(fileSelection);
                 MainWindowController.LoadDisplay(DisplayType.EDIT);
             };
-            TabControl.MouseDown += (sender, e) => {
-                if (TabControl.SelectedIndex != -1)
-                {
-                    Rectangle current = TabControl.GetTabRect(TabControl.SelectedIndex);
-                    Rectangle close = new Rectangle(current.Right - 18, current.Height - 16, 16, 16);
-                    if (close.Contains(e.Location))
-                    {
-                        MainWindowController.CloseActiveFile();
-                    }
-                }
+            designTabControl.TabClosing += (sender) => {
+                MainWindowController.CloseActiveFile();
             };
-            TabControl.TabSwap += (sender, e) => {
+            designTabControl.TabSwap += (sender, e) => {
                 MainWindowController.SwapDesignNodes(e.SourceTabPageIndex, e.DestinationTabPageIndex);
             };
-            Globals.TabControl = TabControl;
 
-            HtmlBuilder = new HtmlBuilder();
+            var browserTabControl = new NewTabControl();
+            browserTabControl.Font = new Font("Segoe UI", 10.75F);
+            browserTabControl.SelectedTabColor = Color.DodgerBlue;
+            browserTabControl.TabBoundaryColor = Color.Black;
+            browserTabControl.SelectedTabTextColor = Color.White;
+            browserTabControl.SelectedIndexChanged += (sender, e) => {
+                if (browserTabControl.SelectedIndex != -1)
+                {
+                    MainWindowController.SelectParser(browserTabControl.TabPages[browserTabControl.SelectedIndex].Name);
+                }
+            };
+            browserTabControl.TabClosing += (sender) => {
+                MainWindowController.CloseParser(((TabPage)sender).Name);
+            };
+            browserTabControl.TabClosed += (sender, e) => {
+                if (e.TabPagesCount == 0)
+                {
+                    SwitchDisplay();
+                }
+            };
 
             // Init browser
             Browser = new WebBrowser();
@@ -176,9 +193,18 @@ namespace VisiBoole.Controllers
                 }
             };
 
+            InstantiationClicks = new TreeNode();
+
+            // Create html builder
+            HtmlBuilder = new HtmlBuilder();
+
             // Init displays
             EditDisplay = editDisplay;
+            EditDisplay.AddTabControl(designTabControl);
+
 			RunDisplay = runDisplay;
+            RunDisplay.AddTabControl(browserTabControl);
+
 			CurrentDisplay = editDisplay;
         }
 
@@ -209,78 +235,22 @@ namespace VisiBoole.Controllers
         }
 
         /// <summary>
-		/// Returns the TabPage that is currently selected
+		/// Selects the tab page with the provided name.
 		/// </summary>
-		/// <returns>Returns the TabPage that is currently selected</returns>
-		public TabPage GetActiveTabPage()
+		/// <param name="name">Name of tabpage to select</param>
+		public void SelectTabPage(string name)
         {
-            return TabControl.SelectedTab;
+            CurrentDisplay.SelectTab(name);
         }
 
         /// <summary>
-        /// Gets the tab index of the provided design name.
-        /// </summary>
-        /// <param name="designName">Name of the design</param>
-        /// <returns>Index of the tab with the provided name</returns>
-        private int GetDesignTabIndex(string designName)
-        {
-            for (int i = 0; i < TabControl.TabPages.Count; i++)
-            {
-                if (TabControl.TabPages[i].Text.TrimStart('*') == designName)
-                {
-                    return i; // Return index of tab with the provided name
-                }
-            }
-            return -1; // Not found
-        }
-
-        /// <summary>
-		/// Selects the tab page with the given index.
-		/// </summary>
-		/// <param name="index">Index of tabpage to select</param>
-        /// <returns>Design name that was selected</returns>
-		public string SelectTabPage(int index)
-        {
-            if (index != -1)
-            {
-                TabControl.SelectTab(index);
-                return TabControl.SelectedTab.Text.TrimStart('*');
-            }
-            else
-            {
-                return "";
-            }
-        }
-
-        /// <summary>
-		/// Creates a new tab on the TabControl
+		/// Creates a new tab on the design tab control.
 		/// </summary>
 		/// <param name="design">The Design that is displayed in the new tab</param>
 		/// <returns>Returns true if a new tab was successfully created</returns>
-		public bool CreateNewTab(Design design)
+		public void CreateNewTab(Design design)
         {
-            TabPage tab = new TabPage(design.FileName);
-            tab.Name = $"designTab{TabControl.TabPages.Count}";
-            tab.Text = design.FileName;
-            tab.ToolTipText = $"{tab.Text}.vbi";
-            tab.Controls.Add(design);
-            design.Dock = DockStyle.Fill;
-
-            if (TabControl.TabPages.ContainsKey(design.FileName))
-            {
-                int index = TabControl.TabPages.IndexOfKey(design.FileName);
-
-                TabControl.TabPages.RemoveByKey(design.FileName);
-                TabControl.TabPages.Insert(index, tab);
-                TabControl.SelectTab(tab);
-                return false;
-            }
-            else
-            {
-                TabControl.TabPages.Add(tab);
-                TabControl.SelectTab(tab);
-                return true;
-            }
+            CurrentDisplay.AddTabComponent(design.FileName, design);
         }
 
         /// <summary>
@@ -383,6 +353,7 @@ namespace VisiBoole.Controllers
             if (CurrentDisplay is DisplayEdit)
             {
                 MainWindowController.LoadDisplay(DisplayType.RUN);
+                InstantiationClicks = new TreeNode();
             }
 
             LastOutput = output;
@@ -429,6 +400,13 @@ namespace VisiBoole.Controllers
         {
             //Browser.ObjectForScripting = this;
             DisplayOutput(MainWindowController.Variable_Click(variableName, value), Browser.Document.Body.ScrollTop);
+            if (InstantiationClicks.Nodes.Count > 0)
+            {
+                foreach (TreeNode node in InstantiationClicks.Nodes)
+                {
+                    Instantiation_Click(node.Text, false);
+                }
+            }
             MainWindowController.RetrieveFocus();
         }
 
@@ -436,8 +414,26 @@ namespace VisiBoole.Controllers
         /// Handles the event that occurs when the user clicks on an instantiation.
         /// </summary>
         /// <param name="instantiation">The instantiation that was clicked by the user</param>
-        public void Instantiation_Click(string instantiation)
+        public void Instantiation_Click(string instantiation, bool addNode = true)
         {
+            if (addNode)
+            {
+                if (InstantiationClicks.Nodes.Count != 0)
+                {
+                    foreach (TreeNode node in InstantiationClicks.Nodes)
+                    {
+                        if (node.Text.Split('.')[0] == DesignController.ActiveDesign.FileName)
+                        {
+                            node.Nodes.Add(instantiation);
+                        }
+                    }
+                }
+                else
+                {
+                    InstantiationClicks.Nodes.Add(instantiation);
+                }
+            }
+
             List<IObjectCodeElement> output = MainWindowController.RunSubdesign(instantiation);
             if (output == null)
             {
@@ -449,7 +445,7 @@ namespace VisiBoole.Controllers
             subBrowser.AllowWebBrowserDrop = false;
             subBrowser.WebBrowserShortcutsEnabled = false;
             subBrowser.ObjectForScripting = this;
-            subBrowser.DocumentText = OutputTemplate.Replace("{0}", HtmlBuilder.GetHTML(output));
+            subBrowser.DocumentText = OutputTemplate.Replace("{0}", HtmlBuilder.GetHTML(output, true));
             subBrowser.PreviewKeyDown += (sender, eventArgs) => {
                 if (eventArgs.Control)
                 {
@@ -475,7 +471,7 @@ namespace VisiBoole.Controllers
                 }
             };
 
-            CurrentDisplay.AddBrowser(instantiation.Split('.')[0], subBrowser);
+            CurrentDisplay.AddTabComponent(instantiation.Split('.')[0], subBrowser);
         }
     }
 }

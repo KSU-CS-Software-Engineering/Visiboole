@@ -54,17 +54,10 @@ namespace VisiBoole.Controllers
 		void AttachMainWindowController(IMainWindowController mwController);
 
         /// <summary>
-        /// Returns the TabPage that is currently selected
-        /// </summary>
-        /// <returns>Returns the TabPage that is currently selected</returns>
-        TabPage GetActiveTabPage();
-
-        /// <summary>
-		/// Selects the tab page with the given index.
+		/// Selects the tab page with the provided name.
 		/// </summary>
-		/// <param name="index">Index of tabpage to select</param>
-        /// <returns>Design name that was selected</returns>
-		string SelectTabPage(int index);
+		/// <param name="name">Name of tabpage to select</param>
+		void SelectTabPage(string name);
 
         /// <summary>
 		/// Creates a new tab on the TabControl

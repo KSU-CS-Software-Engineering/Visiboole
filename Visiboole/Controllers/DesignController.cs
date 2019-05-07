@@ -46,14 +46,14 @@ namespace VisiBoole.Controllers
         private Dictionary<string, Design> Designs;
 
         /// <summary>
+        /// All parsers of running designs in this application
+        /// </summary>
+        private Dictionary<string, Parser> Parsers;
+
+        /// <summary>
         /// The active Design.
         /// </summary>
         public static Design ActiveDesign { get; set; }
-
-        /// <summary>
-        /// Parser used to parse designs.
-        /// </summary>
-        private Parser Parser;
 
         /// <summary>
         /// Constructs design controller
@@ -62,7 +62,7 @@ namespace VisiBoole.Controllers
         {
             Designs = new Dictionary<string, Design>();
             ActiveDesign = null;
-            Parser = null;
+            Parsers = new Dictionary<string, Parser>();
         }
 
         /// <summary>
@@ -233,8 +233,9 @@ namespace VisiBoole.Controllers
         /// <returns>Output of the parsed design</returns>
         public List<IObjectCodeElement> Parse()
         {
-            Parser = new Parser(ActiveDesign);
-            return Parser.Parse();
+            Parser parser = new Parser(ActiveDesign);
+            Parsers.Add(ActiveDesign.FileName, parser);
+            return parser.Parse();
         }
 
         /// <summary>
@@ -243,7 +244,7 @@ namespace VisiBoole.Controllers
         /// <returns>Output of the tick for the parsed design</returns>
         public List<IObjectCodeElement> ParseTick()
         {
-            return Parser.ParseTick();
+            return Parsers[ActiveDesign.FileName].ParseTick();
         }
 
         /// <summary>
@@ -254,7 +255,7 @@ namespace VisiBoole.Controllers
         /// <returns>Output of the tick for the parsed design</returns>
         public List<IObjectCodeElement> ParseVariableClick(string variableName, string value = null)
         {
-            return Parser.ParseClick(variableName, value);
+            return Parsers[ActiveDesign.FileName].ParseClick(variableName, value);
         }
 
         /// <summary>
@@ -264,8 +265,9 @@ namespace VisiBoole.Controllers
         /// <returns>Parsed output</returns>
         public List<IObjectCodeElement> ParseWithInput(List<Variable> inputVariables)
         {
-            Parser = new Parser(ActiveDesign);
-            return Parser.ParseWithInput(inputVariables);
+            Parser parser = new Parser(ActiveDesign);
+            Parsers.Add(ActiveDesign.FileName, parser);
+            return parser.ParseWithInput(inputVariables);
         }
 
         /// <summary>
@@ -279,14 +281,15 @@ namespace VisiBoole.Controllers
 
             string designName = instantiation.Split('.')[0];
             string instantName = instantiation.Split('.')[1].TrimEnd('(');
-            Design subDesign = Parser.Subdesigns[designName];
+            Design subDesign = Parsers[ActiveDesign.FileName].Subdesigns[designName];
 
             // Get input variables
-            List<Variable> inputVariables = Parser.GetModuleInputs(instantName, subDesign.ModuleDeclaration);
+            List<Variable> inputVariables = Parsers[ActiveDesign.FileName].GetModuleInputs(instantName, subDesign.ModuleDeclaration);
 
             // Parse sub design
             ActiveDesign = subDesign;
             Parser subParser = new Parser(subDesign);
+            Parsers.Add(designName, subParser);
             List<IObjectCodeElement> output = subParser.ParseWithInput(inputVariables); // Parse subdesign
             ActiveDesign = currentDesign;
             if (output == null)
@@ -303,7 +306,7 @@ namespace VisiBoole.Controllers
         /// <returns>Active designs current state</returns>
         public List<Variable> GetActiveDesignState()
         {
-            return Parser.ExportState();
+            return Parsers[ActiveDesign.FileName].ExportState();
         }
     }
 }

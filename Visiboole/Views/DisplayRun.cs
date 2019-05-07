@@ -58,49 +58,6 @@ namespace VisiBoole.Views
 		public DisplayRun()
 		{
 			InitializeComponent();
-
-            BrowserTabControl = new NewTabControl();
-            BrowserTabControl.Font = new Font("Segoe UI", 10.75F);
-            BrowserTabControl.SelectedTabColor = Color.DodgerBlue;
-            BrowserTabControl.TabBoundaryColor = Color.Black;
-            BrowserTabControl.SelectedTabTextColor = Color.White;
-            BrowserTabControl.MouseDown += new MouseEventHandler(TabMouseDownEvent);
-        }
-
-        /// <summary>
-        /// Checks whether the user is trying to close a tab
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void TabMouseDownEvent(object sender, MouseEventArgs e)
-        {
-            if (BrowserTabControl.SelectedIndex != -1)
-            {
-                Rectangle current = BrowserTabControl.GetTabRect(BrowserTabControl.SelectedIndex);
-                Rectangle close = new Rectangle(current.Right - 18, current.Height - 16, 16, 16);
-                TabPage tab = BrowserTabControl.SelectedTab;
-                if (close.Contains(e.Location))
-                {
-                    if (BrowserTabControl.TabPages.Count > 1)
-                    {
-                        if (BrowserTabControl.SelectedIndex != 0)
-                        {
-                            BrowserTabControl.SelectedIndex -= 1;
-                        }
-                        else
-                        {
-                            BrowserTabControl.SelectedIndex += 1;
-                        }
-
-                    }
-                    BrowserTabControl.TabPages.Remove(tab); // Remove tab page
-                }
-            }
-
-            if (BrowserTabControl.TabPages.Count == 0)
-            {
-                Controller.SwitchDisplay();
-            }
         }
 
         /// <summary>
@@ -109,15 +66,17 @@ namespace VisiBoole.Views
         /// <param name="controller">The handle to the controller to save</param>
         public void AttachController(IDisplayController controller)
 		{
-			this.Controller = controller;
+			Controller = controller;
 		}
 
         /// <summary>
-        /// Loads the given tabcontrol into this display
-        /// </summary>
-        /// <param name="tc">The tabcontrol that will be loaded by this display</param>
-        public void AddTabControl(TabControl tc)
-		{
+		/// Loads the given tabcontrol into this display
+		/// </summary>
+		/// <param name="tabControl">The tabcontrol that will be loaded by this display</param>
+		public void AddTabControl(NewTabControl tabControl)
+        {
+            BrowserTabControl = tabControl;
+
             pnlMain.Controls.Add(pnlOutputControls, 0, 0);
             pnlMain.Controls.Add(BrowserTabControl, 0, 1);
             BrowserTabControl.Dock = DockStyle.Fill;
@@ -126,21 +85,86 @@ namespace VisiBoole.Views
         }
 
         /// <summary>
-        /// Loads the given web browser into this display
+        /// Selects the tab with the provided name if present.
         /// </summary>
-        /// <param name="designName">Name of the design represented by the browser</param>
-        /// <param name="browser">The browser that will be loaded by this display</param>
-        public void AddBrowser(string designName, WebBrowser browser)
-		{
-            TabPage newTab = new TabPage(designName);
-            newTab.Controls.Add(browser);
-            browser.Dock = DockStyle.Fill;
+        /// <param name="name">Name of tab to select</param>
+        public void SelectTab(string name)
+        {
+            for (int i = 0; i < BrowserTabControl.TabPages.Count; i++)
+            {
+                TabPage tabPage = BrowserTabControl.TabPages[i];
+                if (tabPage.Text == name)
+                {
+                    BrowserTabControl.SelectTab(i);
+                    break;
+                }
+            }
+        }
 
-            BrowserTabControl.TabPages.Add(newTab);
-            BrowserTabControl.SelectedTab = newTab;
+        /// <summary>
+        /// Closes the tab with the provided name if present.
+        /// </summary>
+        /// <param name="name"></param>
+        public void CloseTab(string name)
+        {
+            for (int i = 0; i < BrowserTabControl.TabPages.Count; i++)
+            {
+                TabPage tabPage = BrowserTabControl.TabPages[i];
+                if (tabPage.Text == name)
+                {
+                    BrowserTabControl.TabPages.RemoveAt(i);
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Refreshes the tab control in this display.
+        /// </summary>
+        public void RefreshTabControl()
+        {
+            BrowserTabControl.Refresh();
+        }
+
+        /// <summary>
+        /// Adds/updates a tab page with the provided name and the provided component.
+        /// </summary>
+        /// <param name="name">Name of the tab page to add or update</param>
+        /// <param name="component">Component to add or update</param>
+        public void AddTabComponent(string name, object component)
+        {
+            string designName = name;
+            WebBrowser browser = (WebBrowser)component;
+
+            TabPage existingTabPage = null;
+            foreach (TabPage tabPage in BrowserTabControl.TabPages)
+            {
+                if (tabPage.Text == name)
+                {
+                    existingTabPage = tabPage;
+                    break;
+                }
+            }
+
+            if (existingTabPage == null)
+            {
+                TabPage newTabPage = new TabPage(name);
+                newTabPage.Text = name;
+                newTabPage.ToolTipText = $"{name}.vbi";
+                newTabPage.Controls.Add(browser);
+                browser.Dock = DockStyle.Fill;
+                BrowserTabControl.TabPages.Add(newTabPage);
+                BrowserTabControl.SelectedTab = newTabPage;
+            }
+            else
+            {
+                existingTabPage.Controls.Clear();
+                existingTabPage.Controls.Add(browser);
+                browser.Dock = DockStyle.Fill;
+            }
 
             pnlMain.Focus();
-		}
+        }
 
         /// <summary>
         /// Handles the event when the tick button is clicked

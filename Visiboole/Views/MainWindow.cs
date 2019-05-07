@@ -528,7 +528,7 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void NavTree_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
         {
-            MainWindowController.SelectFile(e.Node.Index);
+            MainWindowController.SelectFile(e.Node.Name);
             MainWindowController.SwitchDisplay();
         }
 
