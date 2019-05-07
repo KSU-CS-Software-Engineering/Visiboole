@@ -35,7 +35,7 @@ namespace VisiBoole.Controllers
         /// Gets the display of the main window.
         /// </summary>
         /// <returns>The display</returns>
-        IDisplay GetDisplay();
+        DisplayType GetCurrentDisplayType();
 
         /// <summary>
         /// Switch display mode

@@ -133,32 +133,27 @@ namespace VisiBoole.Views
         /// Update buttons and icons based on the display
         /// </summary>
         /// <param name="current"></param>
-        private void UpdateControls(IDisplay display)
+        private void UpdateControls(DisplayType displayType)
         {
-            openIcon.Enabled = (display.TypeOfDisplay == DisplayType.EDIT);
-            openToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT);
-            newIcon.Enabled = (display.TypeOfDisplay == DisplayType.EDIT);
-            newToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT);
-            saveIcon.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
-            saveAllIcon.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
-            saveToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
-            saveAsToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
-            runModeToggle.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
-            runStateToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
-            newStateToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
-            editModeToggle.Enabled = (display.TypeOfDisplay == DisplayType.RUN);
-            closeDesignToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
-            closeAllDesignToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
-            increaseFontToolStripMenuItem.Enabled = (NavTree.Nodes[0].Nodes.Count > 0);
-            decreaseFontToolStripMenuItem.Enabled = (NavTree.Nodes[0].Nodes.Count > 0);
-            selectAllToolStripMenuItem.Enabled = (display.TypeOfDisplay == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0);
+            openIcon.Enabled = displayType == DisplayType.EDIT;
+            openToolStripMenuItem.Enabled = displayType == DisplayType.EDIT;
+            newIcon.Enabled = displayType == DisplayType.EDIT;
+            newToolStripMenuItem.Enabled = displayType == DisplayType.EDIT;
+            saveIcon.Enabled = displayType == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0;
+            saveAllIcon.Enabled = displayType == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0;
+            saveToolStripMenuItem.Enabled = displayType == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0;
+            saveAsToolStripMenuItem.Enabled = displayType == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0;
+            runModeToggle.Enabled = displayType == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0;
+            runStateToolStripMenuItem.Enabled = displayType == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0;
+            newStateToolStripMenuItem.Enabled = displayType == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0;
+            editModeToggle.Enabled = displayType == DisplayType.RUN;
+            closeDesignToolStripMenuItem.Enabled = displayType == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0;
+            closeAllDesignToolStripMenuItem.Enabled = displayType == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0;
+            increaseFontToolStripMenuItem.Enabled = NavTree.Nodes[0].Nodes.Count > 0;
+            decreaseFontToolStripMenuItem.Enabled = NavTree.Nodes[0].Nodes.Count > 0;
+            selectAllToolStripMenuItem.Enabled = displayType == DisplayType.EDIT && NavTree.Nodes[0].Nodes.Count > 0;
 
-            if (NavTree.Nodes[0].Nodes.Count > 0)
-            {
-                MainWindowController.SetFontSize();
-            }
-
-            if (display.TypeOfDisplay == DisplayType.EDIT && DesignController.ActiveDesign != null)
+            if (displayType == DisplayType.EDIT && DesignController.ActiveDesign != null)
             {
                 undoToolStripMenuItem.Enabled = DesignController.ActiveDesign.EditHistory.Count > 0;
                 undoToolStripMenuItem1.Enabled = DesignController.ActiveDesign.EditHistory.Count > 0;
@@ -233,13 +228,6 @@ namespace VisiBoole.Views
             contextMenu.MenuItems.Add("Close All Designs", new EventHandler(CloseAllMenuClick));
             fileNode.ContextMenu = contextMenu;
 
-            /*
-            if (NavTree.Nodes.ContainsKey(fileName))
-            {
-                Globals.Dialog.New("Error", "Node " + fileName + " already exists in Desings.", DialogType.Ok);
-            }
-            */
-
             NavTree.Nodes[0].Nodes.Add(fileNode);
             NavTree.ExpandAll();
         }
@@ -263,10 +251,6 @@ namespace VisiBoole.Views
         public void RemoveNavTreeNode(string name)
         {
             NavTree.Nodes[0].Nodes.RemoveByKey(name);
-            if (NavTree.Nodes[0].Nodes.Count == 0)
-            {
-                MainWindowController.LoadDisplay(DisplayType.EDIT); // Switches to default view
-            }
         }
 
         /// <summary>
@@ -328,7 +312,7 @@ namespace VisiBoole.Views
                 MainLayoutPanel.Controls.Add(currentControls);
             }
 
-            UpdateControls(current); // Change controls to match the new display
+            UpdateControls(MainWindowController.GetCurrentDisplayType()); // Change controls to match the new display
         }
 
         /// <summary>
@@ -528,8 +512,8 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void NavTree_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
         {
-            MainWindowController.SelectFile(e.Node.Name);
             MainWindowController.SwitchDisplay();
+            MainWindowController.SelectFile(e.Node.Name);
         }
 
         /// <summary>
@@ -560,11 +544,7 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void EditMenuClick(object sender, EventArgs e)
         {
-            IDisplay display = MainWindowController.GetDisplay();
-            if (display != null && display is DisplayEdit)
-            {
-                UpdateControls(display);
-            }
+            UpdateControls(MainWindowController.GetCurrentDisplayType());
         }
 
         /// <summary>
@@ -636,6 +616,11 @@ namespace VisiBoole.Views
         {
             HelpWindow hw = new HelpWindow("VisiBoole Syntax", File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "Resources", "Help Documentation", "Syntax.txt")));
             hw.Show();
+        }
+
+        private void SwitchDisplay()
+        {
+            if ()
         }
 
         /// <summary>

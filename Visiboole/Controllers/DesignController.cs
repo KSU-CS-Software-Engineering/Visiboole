@@ -129,10 +129,6 @@ namespace VisiBoole.Controllers
         public Design CreateDesign(string path)
         {
             Design newDesign = new Design(path);
-            if (mwController != null)
-            {
-                newDesign.DesignEdit += new DesignEditEventHandler(mwController.OnDesignEdit);
-            }
             
             if (!Designs.ContainsKey(newDesign.FileName))
             {

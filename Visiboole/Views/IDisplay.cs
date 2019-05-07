@@ -19,6 +19,7 @@
  */
 
 using CustomTabControl;
+using System.Drawing;
 using System.Windows.Forms;
 using VisiBoole.Controllers;
 
@@ -28,23 +29,30 @@ namespace VisiBoole.Views
 	/// Exposes methods for the four displays hosted by the MainWindow
 	/// </summary>
 	public interface IDisplay
-	{
-		/// <summary>
-		/// Returns the type of this display
-		/// </summary>
-		DisplayType TypeOfDisplay { get; }
+    {
+        /// <summary>
+        /// Returns the type of this display
+        /// </summary>
+        DisplayType DisplayType { get; }
 
-		/// <summary>
-		/// Saves the handle to the controller for this display
-		/// </summary>
-		/// <param name="controller">The handle to the controller to save</param>
-		void AttachController(IDisplayController controller);
+        /// <summary>
+        /// Saves the handle to the controller for this display
+        /// </summary>
+        /// <param name="controller">The handle to the controller to save</param>
+        void AttachController(IDisplayController controller);
 
         /// <summary>
 		/// Loads the given tab control into this display.
 		/// </summary>
 		/// <param name="tabControl">The tabcontrol that will be loaded by this display</param>
-		void AddTabControl(NewTabControl tabControl);
+		void AttachTabControl(NewTabControl tabControl);
+
+        /// <summary>
+        /// Adds/updates a tab page with the provided name and the provided component.
+        /// </summary>
+        /// <param name="name">Name of the tab page to add or update</param>
+        /// <param name="component">Component to add or update</param>
+        void AddTabComponent(string name, object component);
 
         /// <summary>
         /// Selects the tab with the provided name if present.
@@ -59,15 +67,8 @@ namespace VisiBoole.Views
         void CloseTab(string name);
 
         /// <summary>
-        /// Refreshes the tab control in this display.
+        /// Sets the theme of the control.
         /// </summary>
-        void RefreshTabControl();
-
-        /// <summary>
-        /// Adds/updates a tab page with the provided name and the provided component.
-        /// </summary>
-        /// <param name="name">Name of the tab page to add or update</param>
-        /// <param name="component">Component to add or update</param>
-        void AddTabComponent(string name, object component);
+        void SetTheme();
     }
 }

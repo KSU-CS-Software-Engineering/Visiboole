@@ -20,6 +20,7 @@
 
 using CustomTabControl;
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 using VisiBoole.Controllers;
 using VisiBoole.Models;
@@ -32,65 +33,49 @@ namespace VisiBoole.Views
 	public partial class DisplayEdit : UserControl, IDisplay
 	{
         /// <summary>
-        /// Tab control for designs in edit mode.
+        /// Controller for this display.
         /// </summary>
-        private NewTabControl DesignTabControl;
-
-		/// <summary>
-		/// Handle to the controller for this display
-		/// </summary>
-		private IDisplayController Controller;
-
-		/// <summary>
-		/// Returns the type of this display
-		/// </summary>
-		public DisplayType TypeOfDisplay
-		{
-			get
-			{
-				return DisplayType.EDIT;
-			}
-		}
-
-		/// <summary>
-		/// Constructs an instance of DisplaySingle
-		/// </summary>
-		public DisplayEdit()
-		{
-			InitializeComponent();
-		}
-
-		/// <summary>
-		/// Saves the handle to the controller for this display
-		/// </summary>
-		/// <param name="controller">The handle to the controller to save</param>
-		public void AttachController(IDisplayController controller)
-		{
-			Controller = controller;
-		}
+        private IDisplayController Controller;
 
         /// <summary>
-		/// Loads the given tabcontrol into this display
-		/// </summary>
-		/// <param name="tabControl">The tabcontrol that will be loaded by this display</param>
-		public void AddTabControl(NewTabControl tabControl)
+        /// Tab control for this display.
+        /// </summary>
+        private NewTabControl TabControl;
+
+        /// <summary>
+        /// Type of this display.
+        /// </summary>
+        public DisplayType DisplayType { get { return DisplayType.EDIT; } }
+
+        /// <summary>
+        /// Constucts an instance of DisplaySingleOutput
+        /// </summary>
+        public DisplayEdit()
         {
-            if (!(tabControl == null))
-            {
-                DesignTabControl = tabControl;
-                pnlMain.Controls.Add(DesignTabControl, 0, 0);
-                DesignTabControl.Dock = DockStyle.Fill;
-            }
+            InitializeComponent();
         }
 
         /// <summary>
-        /// Returns a tab page with the provided name.
+        /// Saves the handle to the controller for this display
         /// </summary>
-        /// <param name="name">Name of tab page.</param>
-        /// <returns>Tab page with the provided name</returns>
-        private TabPage FindTabPage(string name)
+        /// <param name="controller">The handle to the controller to save</param>
+        public void AttachController(IDisplayController controller)
         {
-            foreach (TabPage tabPage in DesignTabControl.TabPages)
+            Controller = controller;
+        }
+
+        /// <summary>
+		/// Loads the given tab control into this display.
+		/// </summary>
+		/// <param name="tabControl">The tabcontrol that will be loaded by this display</param>
+		public void AttachTabControl(NewTabControl tabControl)
+        {
+            TabControl = tabControl;
+        }
+
+        private TabPage FindTab(string name)
+        {
+            foreach (TabPage tabPage in TabControl.TabPages)
             {
                 if (tabPage.Text.TrimStart('*') == name)
                 {
@@ -107,12 +92,12 @@ namespace VisiBoole.Views
         /// <param name="name">Name of tab to select</param>
         public void SelectTab(string name)
         {
-            for (int i = 0; i < DesignTabControl.TabPages.Count; i++)
+            for (int i = 0; i < TabControl.TabPages.Count; i++)
             {
-                TabPage tabPage = DesignTabControl.TabPages[i];
+                TabPage tabPage = TabControl.TabPages[i];
                 if (tabPage.Text.TrimStart('*') == name)
                 {
-                    DesignTabControl.SelectTab(i);
+                    TabControl.SelectTab(i);
                     break;
                 }
             }
@@ -124,23 +109,26 @@ namespace VisiBoole.Views
         /// <param name="name"></param>
         public void CloseTab(string name)
         {
-            for (int i = 0; i < DesignTabControl.TabPages.Count; i++)
+            for (int i = 0; i < TabControl.TabPages.Count; i++)
             {
-                TabPage tabPage = DesignTabControl.TabPages[i];
+                TabPage tabPage = TabControl.TabPages[i];
                 if (tabPage.Text.TrimStart('*') == name)
                 {
-                    DesignTabControl.TabPages.RemoveAt(i);
+                    TabControl.TabPages.RemoveAt(i);
                     break;
                 }
             }
         }
 
         /// <summary>
-        /// Refreshes the tab control in this display.
+        /// Sets the theme of edit and run tab control
         /// </summary>
-        public void RefreshTabControl()
+        public void SetTheme()
         {
-            DesignTabControl.Refresh();
+            TabControl.BackgroundColor = Properties.Settings.Default.Theme == "Light" ? Color.AliceBlue : Color.FromArgb(66, 66, 66);
+            TabControl.TabColor = Properties.Settings.Default.Theme == "Light" ? Color.White : Color.FromArgb(66, 66, 66);
+            TabControl.TabTextColor = Properties.Settings.Default.Theme == "Light" ? Color.Black : Color.White;
+            TabControl.Refresh();
         }
 
         /// <summary>
@@ -152,25 +140,23 @@ namespace VisiBoole.Views
         {
             var design = (Design)component;
 
-            TabPage existingTabPage = null;
-            foreach (TabPage tabPage in DesignTabControl.TabPages)
-            {
-                if (tabPage.Text.TrimStart('*') == name)
-                {
-                    existingTabPage = tabPage;
-                    break;
-                }
-            }
-
+            TabPage existingTabPage = FindTab(name);
             if (existingTabPage == null)
             {
                 TabPage newTabPage = new TabPage(name);
                 newTabPage.Text = name;
                 newTabPage.ToolTipText = $"{name}.vbi";
                 newTabPage.Controls.Add(design);
+
                 design.Dock = DockStyle.Fill;
-                DesignTabControl.TabPages.Add(newTabPage);
-                DesignTabControl.SelectedTab = newTabPage;
+                design.DesignEdit += (designName, isDirty) =>
+                {
+                    TabPage tabPage = FindTab(designName);
+                    tabPage.Text = isDirty ? $"*{designName}" : designName;
+                };
+
+                TabControl.TabPages.Add(newTabPage);
+                TabControl.SelectedTab = newTabPage;
             }
             else
             {

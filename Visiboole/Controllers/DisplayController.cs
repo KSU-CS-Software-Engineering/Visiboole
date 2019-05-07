@@ -94,25 +94,7 @@ namespace VisiBoole.Controllers
 		/// <summary>
 		/// The display that is currently hosted by the MainWindow
 		/// </summary>
-		private IDisplay currentDisplay;
-
-		/// <summary>
-		/// The display that is currently hosted by the MainWindow
-		/// </summary>
-		public IDisplay CurrentDisplay
-		{
-			get
-			{
-				return currentDisplay;
-			}
-			set
-			{
-				value.AddTabControl(TabControl);
-                string currentDesign = TabControl.SelectedTab != null ? TabControl.SelectedTab.Text.TrimStart('*') : "";
-				value.AddTabComponent(currentDesign, Browser);
-				currentDisplay = value;
-			}
-		}
+		public IDisplay CurrentDisplay { get; set; }
 
         /// <summary>
         /// Constructs an instance of DisplayController with a handle to the two displays.
@@ -200,10 +182,10 @@ namespace VisiBoole.Controllers
 
             // Init displays
             EditDisplay = editDisplay;
-            EditDisplay.AddTabControl(designTabControl);
+            EditDisplay.AttachTabControl(designTabControl);
 
 			RunDisplay = runDisplay;
-            RunDisplay.AddTabControl(browserTabControl);
+            RunDisplay.AttachTabControl(browserTabControl);
 
 			CurrentDisplay = editDisplay;
         }
@@ -248,7 +230,7 @@ namespace VisiBoole.Controllers
 		/// </summary>
 		/// <param name="design">The Design that is displayed in the new tab</param>
 		/// <returns>Returns true if a new tab was successfully created</returns>
-		public void CreateNewTab(Design design)
+		public void CreateDesignTab(Design design)
         {
             CurrentDisplay.AddTabComponent(design.FileName, design);
         }
@@ -258,85 +240,9 @@ namespace VisiBoole.Controllers
         /// </summary>
         /// <param name="designName">Name of the design being closed</param>
         /// <returns>Whether the operation was successful</returns>
-        public bool CloseTab(string designName)
+        public void CloseDesignTab(string name)
         {
-            TabPage tab = TabControl.TabPages[GetDesignTabIndex(designName)];
-
-            if (tab != null)
-            {
-                if (TabControl.SelectedIndex != 0)
-                {
-                    TabControl.SelectedIndex -= 1;
-                }
-                else
-                {
-                    TabControl.SelectedIndex += 1;
-                }
-
-                TabControl.TabPages.Remove(tab); // Remove tab page
-
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Updates the provided tab with a new design. (Used for SaveAs operations)
-        /// </summary>
-        /// <param name="tabName">Name of tab</param>
-        /// <param name="newDesign">Design to add</param>
-        public void UpdateTab(string tabName, Design newDesign)
-        {
-            // Get index of tab
-            int designTabIndex = GetDesignTabIndex(tabName);
-            // Get tab from tab control
-            TabPage tab = TabControl.TabPages[designTabIndex];
-            // Remove design from tab's controls
-            tab.Controls.Clear();
-            // Update tab text
-            tab.Text = newDesign.FileName;
-            // Update tab tool tip text
-            tab.ToolTipText = $"{tab.Text}.vbi";
-            // Add new design to tab
-            tab.Controls.Add(newDesign);
-            // Fill tab with new design
-            newDesign.Dock = DockStyle.Fill;
-        }
-
-        /// <summary>
-        /// Updates the tab text to include or remove the dirty indicator.
-        /// </summary>
-        /// <param name="designName">Design name of the tab to update</param>
-        /// <param name="isDirty">Whether the design has unsaved changes</param>
-        public void UpdateTabText(string designName, bool isDirty)
-        {
-            int designTabIndex = GetDesignTabIndex(designName);
-            if (designTabIndex != -1)
-            {
-                TabControl.TabPages[designTabIndex].Text = isDirty ? $"*{designName}" : designName;
-            }
-        }
-
-        /// <summary>
-        /// Sets the theme of edit and run tab control
-        /// </summary>
-        public void SetTheme()
-        {
-            TabControl.BackgroundColor = Properties.Settings.Default.Theme == "Light" ? Color.AliceBlue : Color.FromArgb(66, 66, 66);
-            TabControl.TabColor = Properties.Settings.Default.Theme == "Light" ? Color.White : Color.FromArgb(66, 66, 66);
-            TabControl.TabTextColor = Properties.Settings.Default.Theme == "Light" ? Color.Black : Color.White;
-
-            if (CurrentDisplay is DisplayEdit)
-            {
-                TabControl.Refresh();
-            }
-            else
-            {
-                
-            }
+            CurrentDisplay.CloseTab(name);
         }
 
         /// <summary>

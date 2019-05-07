@@ -67,9 +67,9 @@ namespace VisiBoole.Controllers
         /// Gets the display of the main window.
         /// </summary>
         /// <returns>The display</returns>
-        public IDisplay GetDisplay()
+        public DisplayType GetCurrentDisplayType()
         {
-            return DisplayController.CurrentDisplay;
+            return DisplayController.CurrentDisplay.DisplayType;
         }
 
         /// <summary>
@@ -145,12 +145,8 @@ namespace VisiBoole.Controllers
             }
 
             Design design = DesignController.CreateDesign(path);
-            if (DisplayController.CreateNewTab(design) == true)
-            {
-                MainWindow.AddNavTreeNode(design.FileName);
-            }
-
-            LoadDisplay(DisplayController.CurrentDisplay.TypeOfDisplay);
+            DisplayController.CreateDesignTab(design);
+            MainWindow.AddNavTreeNode(design.FileName);
         }
 
         /// <summary>
@@ -182,7 +178,7 @@ namespace VisiBoole.Controllers
             // Close old design
             DesignController.CloseDesign(currentDesignName, false);
             // Update tab with new design
-            DisplayController.UpdateTab(currentDesignName, newDesign);
+            DisplayController.CreateDesignTab(newDesign);
             // Update node with new design
             MainWindow.UpdateNavTreeNode(currentDesignName, newDesign.FileName);
             // Display success
@@ -224,7 +220,7 @@ namespace VisiBoole.Controllers
                 }
 
                 // Otherwise close file
-                DisplayController.CloseTab(designName);
+                DisplayController.CloseDesignTab(designName);
                 DesignController.CloseDesign(designName, save);
                 MainWindow.RemoveNavTreeNode(designName);
                 return designName;
@@ -278,17 +274,6 @@ namespace VisiBoole.Controllers
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Handles the event that occurs when an edit has been made to a design.
-        /// </summary>
-        /// <param name="designName">Name of the design that was edited</param>
-        /// <param name="isDirty">Whether the design has unsaved changes</param>
-        public void OnDesignEdit(string designName, bool isDirty)
-        {
-            DisplayController.UpdateTabText(designName, isDirty);
-            LoadDisplay(DisplayType.EDIT);
         }
 
         /// <summary>

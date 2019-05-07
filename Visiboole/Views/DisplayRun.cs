@@ -29,28 +29,22 @@ namespace VisiBoole.Views
 	/// <summary>
 	/// The horizontally-split display that is hosted by the MainWindow
 	/// </summary>
-	public partial class DisplayRun : UserControl, IDisplay
+	public partial class DisplayRun: UserControl, IDisplay
 	{
         /// <summary>
-        /// Tab control for designs in run mode.
+        /// Controller for this display.
         /// </summary>
-        private NewTabControl BrowserTabControl;
+        private IDisplayController Controller;
+
+        /// <summary>
+        /// Tab control for this display.
+        /// </summary>
+        private NewTabControl TabControl;
 
 		/// <summary>
-		/// Handle to the controller for this display
+		/// Type of this display.
 		/// </summary>
-		private IDisplayController Controller;
-
-		/// <summary>
-		/// Returns the type of this display
-		/// </summary>
-		public DisplayType TypeOfDisplay
-		{
-			get
-			{
-                return DisplayType.RUN;
-			}
-		}
+		public DisplayType DisplayType { get { return DisplayType.RUN; } }
 
 		/// <summary>
 		/// Constucts an instance of DisplaySingleOutput
@@ -65,23 +59,17 @@ namespace VisiBoole.Views
         /// </summary>
         /// <param name="controller">The handle to the controller to save</param>
         public void AttachController(IDisplayController controller)
-		{
-			Controller = controller;
-		}
+        {
+            Controller = controller;
+        }
 
         /// <summary>
-		/// Loads the given tabcontrol into this display
+		/// Loads the given tab control into this display.
 		/// </summary>
 		/// <param name="tabControl">The tabcontrol that will be loaded by this display</param>
-		public void AddTabControl(NewTabControl tabControl)
+		public void AttachTabControl(NewTabControl tabControl)
         {
-            BrowserTabControl = tabControl;
-
-            pnlMain.Controls.Add(pnlOutputControls, 0, 0);
-            pnlMain.Controls.Add(BrowserTabControl, 0, 1);
-            BrowserTabControl.Dock = DockStyle.Fill;
-            BrowserTabControl.TabPages.Clear();
-            numericUpDown1.Value = 7; // Reset value
+            TabControl = tabControl;
         }
 
         /// <summary>
@@ -90,12 +78,12 @@ namespace VisiBoole.Views
         /// <param name="name">Name of tab to select</param>
         public void SelectTab(string name)
         {
-            for (int i = 0; i < BrowserTabControl.TabPages.Count; i++)
+            for (int i = 0; i < TabControl.TabPages.Count; i++)
             {
-                TabPage tabPage = BrowserTabControl.TabPages[i];
+                TabPage tabPage = TabControl.TabPages[i];
                 if (tabPage.Text == name)
                 {
-                    BrowserTabControl.SelectTab(i);
+                    TabControl.SelectTab(i);
                     break;
                 }
             }
@@ -107,23 +95,26 @@ namespace VisiBoole.Views
         /// <param name="name"></param>
         public void CloseTab(string name)
         {
-            for (int i = 0; i < BrowserTabControl.TabPages.Count; i++)
+            for (int i = 0; i < TabControl.TabPages.Count; i++)
             {
-                TabPage tabPage = BrowserTabControl.TabPages[i];
+                TabPage tabPage = TabControl.TabPages[i];
                 if (tabPage.Text == name)
                 {
-                    BrowserTabControl.TabPages.RemoveAt(i);
+                    TabControl.TabPages.RemoveAt(i);
                     break;
                 }
             }
         }
 
         /// <summary>
-        /// Refreshes the tab control in this display.
+        /// Sets the theme of edit and run tab control
         /// </summary>
-        public void RefreshTabControl()
+        public void SetTheme()
         {
-            BrowserTabControl.Refresh();
+            TabControl.BackgroundColor = Properties.Settings.Default.Theme == "Light" ? Color.AliceBlue : Color.FromArgb(66, 66, 66);
+            TabControl.TabColor = Properties.Settings.Default.Theme == "Light" ? Color.White : Color.FromArgb(66, 66, 66);
+            TabControl.TabTextColor = Properties.Settings.Default.Theme == "Light" ? Color.Black : Color.White;
+            TabControl.Refresh();
         }
 
         /// <summary>
@@ -137,7 +128,7 @@ namespace VisiBoole.Views
             WebBrowser browser = (WebBrowser)component;
 
             TabPage existingTabPage = null;
-            foreach (TabPage tabPage in BrowserTabControl.TabPages)
+            foreach (TabPage tabPage in TabControl.TabPages)
             {
                 if (tabPage.Text == name)
                 {
@@ -153,8 +144,8 @@ namespace VisiBoole.Views
                 newTabPage.ToolTipText = $"{name}.vbi";
                 newTabPage.Controls.Add(browser);
                 browser.Dock = DockStyle.Fill;
-                BrowserTabControl.TabPages.Add(newTabPage);
-                BrowserTabControl.SelectedTab = newTabPage;
+                TabControl.TabPages.Add(newTabPage);
+                TabControl.SelectedTab = newTabPage;
             }
             else
             {
