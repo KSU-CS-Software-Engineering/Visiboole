@@ -107,7 +107,7 @@ namespace VisiBoole.Controllers
             designTabControl.TabClosing += (sender) => {
                 if (DesignController.ActiveDesign != null)
                 {
-                    MainWindowController.CloseActiveFile(false);
+                    MainWindowController.CloseFile(null, false);
                 }
             };
             designTabControl.TabSwap += (sender, e) => {
@@ -217,6 +217,14 @@ namespace VisiBoole.Controllers
         public void CloseDesignTab(string name)
         {
             CurrentDisplay.CloseTab(name);
+        }
+
+        /// <summary>
+        /// Closes all parsers
+        /// </summary>
+        public void CloseParsers()
+        {
+            CurrentDisplay.CloseTabs();
         }
 
         /// <summary>

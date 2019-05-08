@@ -227,8 +227,8 @@ namespace VisiBoole.Views
 
             fileNode.Name = fileName;
             ContextMenu contextMenu = new ContextMenu();
-            contextMenu.MenuItems.Add("Save Design", new EventHandler(SaveFileMenuClick));
-            contextMenu.MenuItems.Add("Close Design", new EventHandler(CloseFileMenuClick));
+            contextMenu.MenuItems.Add("Save Design", SaveDesignContextMenuClick);
+            contextMenu.MenuItems.Add("Close Design", CloseDesignContextMenuClick);
             contextMenu.MenuItems.Add("Close All Except This", new EventHandler(CloseAllExceptMenuClick));
             contextMenu.MenuItems.Add("Close All Designs", new EventHandler(CloseAllMenuClick));
             fileNode.ContextMenu = contextMenu;
@@ -522,8 +522,8 @@ namespace VisiBoole.Views
         {
             if (editModeToggle.Enabled)
             {
-                MainWindowController.LoadDisplay(DisplayType.EDIT);
                 MainWindowController.ClearParsers();
+                MainWindowController.LoadDisplay(DisplayType.EDIT);
             }
             MainWindowController.SelectFile(e.Node.Name, true);
         }
@@ -546,8 +546,8 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void EditButtonClick(object sender, EventArgs e)
         {
-            MainWindowController.LoadDisplay(DisplayType.EDIT);
             MainWindowController.ClearParsers();
+            MainWindowController.LoadDisplay(DisplayType.EDIT);
         }
 
         /// <summary>
@@ -660,8 +660,19 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void CloseFileMenuClick(object sender, EventArgs e)
         {
-            MainWindowController.CloseActiveFile();
+            MainWindowController.CloseFile();
             CheckToAddOpenFileLink();
+        }
+
+        private void CloseDesignContextMenuClick(object sender, EventArgs e)
+        {
+            MainWindowController.CloseFile(NavTree.SelectedNode.Name);
+            CheckToAddOpenFileLink();
+        }
+
+        private void SaveDesignContextMenuClick(object sender, EventArgs e)
+        {
+            MainWindowController.SaveFile(NavTree.SelectedNode.Name);
         }
 
         /// <summary>

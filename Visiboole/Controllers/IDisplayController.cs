@@ -78,6 +78,11 @@ namespace VisiBoole.Controllers
         void CloseDesignTab(string name);
 
         /// <summary>
+        /// Closes all parsers
+        /// </summary>
+        void CloseParsers();
+
+        /// <summary>
         /// Sets the theme of edit and run tab control
         /// </summary>
         void SetTheme();

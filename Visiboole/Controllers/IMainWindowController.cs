@@ -63,9 +63,9 @@ namespace VisiBoole.Controllers
 		void ProcessNewFile(string path, bool overwriteExisting = false);
 
         /// <summary>
-        /// Saves the file that is currently active in the selected tabpage
+        /// Saves the provided file or the active file if none provided.
         /// </summary>
-        void SaveFile();
+        void SaveFile(string name = null);
 
         /// <summary>
         /// Saves the file that is currently active in the selected tabpage with the filename chosen by the user
@@ -79,10 +79,12 @@ namespace VisiBoole.Controllers
 		void SaveFiles();
 
         /// <summary>
-        /// Closes the selected open file
+        /// Closes a specific file or the opened design and optionally updates the design tab control.
         /// </summary>
-        /// <returns>The name of the file closed</returns>
-        void CloseActiveFile(bool updateDesignControl = true);
+        /// <param name="name"></param>
+        /// <param name="updateDesignControl"></param>
+        /// <returns></returns>
+        string CloseFile(string name = null, bool updateDesignControl = true);
 
         /// <summary>
         /// Closes all files.

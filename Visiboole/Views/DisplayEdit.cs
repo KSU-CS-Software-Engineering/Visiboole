@@ -123,6 +123,14 @@ namespace VisiBoole.Views
         }
 
         /// <summary>
+        /// Closes all tabs.
+        /// </summary>
+        public void CloseTabs()
+        {
+            TabControl.TabPages.Clear();
+        }
+
+        /// <summary>
         /// Sets the theme of edit and run tab control
         /// </summary>
         public void SetTheme()

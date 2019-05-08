@@ -67,6 +67,11 @@ namespace VisiBoole.Views
         void CloseTab(string name);
 
         /// <summary>
+        /// Closes all tabs.
+        /// </summary>
+        void CloseTabs();
+
+        /// <summary>
         /// Sets the theme of the control.
         /// </summary>
         void SetTheme();

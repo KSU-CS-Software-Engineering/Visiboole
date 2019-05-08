@@ -140,11 +140,11 @@ namespace VisiBoole.Controllers
         }
 
         /// <summary>
-        /// Saves the file that is currently active in the selected tabpage
+        /// Saves the provided file or the active file if none provided.
         /// </summary>
-        public void SaveFile()
+        public void SaveFile(string name = null)
         {
-            SaveFileSuccess(DesignController.SaveActiveDesign());
+            SaveFileSuccess(DesignController.SaveDesign(name));
         }
 
         /// <summary>
@@ -184,13 +184,17 @@ namespace VisiBoole.Controllers
         }
 
         /// <summary>
-        /// Closes a file with the provided name.
+        /// Closes a specific file or the opened design and optionally updates the design tab control.
         /// </summary>
-        /// <param name="designName">Name of file to close</param>
-        /// <returns>The name of the file closed</returns>
-        private string CloseFile(string designName, bool updateDesignControl = true)
+        /// <param name="name"></param>
+        /// <param name="updateDesignControl"></param>
+        /// <returns></returns>
+        public string CloseFile(string name = null, bool updateDesignControl = true)
         {
-            Design design = DesignController.GetDesign(designName);
+            // Save active design
+            Design activeDesign = DesignController.GetActiveDesign();
+            string designName = name ?? activeDesign.FileName;
+            Design design = designName == null ? activeDesign : DesignController.GetDesign(designName);
 
             if (design != null)
             {
@@ -222,14 +226,6 @@ namespace VisiBoole.Controllers
             {
                 return null;
             }
-        }
-
-        /// <summary>
-        /// Closes the selected open file
-        /// </summary>
-        public void CloseActiveFile(bool updateDesignControl = true)
-        {
-            CloseFile(Controllers.DesignController.ActiveDesign.FileName, updateDesignControl);
         }
 
         /// <summary>
@@ -391,6 +387,7 @@ namespace VisiBoole.Controllers
         public void ClearParsers()
         {
             DesignController.ClearParsers();
+            DisplayController.CloseParsers();
         }
 
         /// <summary>

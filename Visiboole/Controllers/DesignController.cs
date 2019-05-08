@@ -183,13 +183,21 @@ namespace VisiBoole.Controllers
         }
 
         /// <summary>
-        /// Saves the active Design.
+        /// Saves the provided design or the active design if none is provided.
         /// </summary>
         /// <returns>Whether the save was successful</returns>
-        public bool SaveActiveDesign()
+        public bool SaveDesign(string name = null)
         {
-            SaveDesign(ActiveDesign);
-            return true;
+            Design designToSave = name == null ? ActiveDesign : GetDesign(name);
+            if (designToSave != null)
+            {
+                SaveDesign(designToSave);
+                return true;
+            }
+            else
+            {
+                return false;
+            }
         }
 
         /// <summary>

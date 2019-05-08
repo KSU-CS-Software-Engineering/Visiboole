@@ -75,10 +75,10 @@ namespace VisiBoole.Controllers
         Design CreateDesign(string name);
 
         /// <summary>
-        /// Saves the active Design.
+        /// Saves the provided design or the active design if none is provided.
         /// </summary>
         /// <returns>Whether the save was successful</returns>
-        bool SaveActiveDesign();
+        bool SaveDesign(string name = null);
 
         /// <summary>
         /// Saves all Designs

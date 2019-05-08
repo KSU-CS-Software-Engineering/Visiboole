@@ -82,9 +82,10 @@ namespace VisiBoole.ParsingEngine.Statements
             Parser subParser = new Parser(Subdesign);
             DesignController.ActiveDesign = Subdesign;
             List<bool> outputValues = subParser.ParseAsModule(inputValues);
+            // Reset active design
+            DesignController.ActiveDesign = currentDesign;
             if (outputValues == null)
             {
-                DesignController.ActiveDesign = currentDesign;
                 return false;
             }
 
@@ -104,8 +105,7 @@ namespace VisiBoole.ParsingEngine.Statements
                 outputValueIndex++;
             }
 
-            // Reset active design
-            DesignController.ActiveDesign = currentDesign;
+            
 
             return true;
         }
