@@ -81,7 +81,7 @@ namespace VisiBoole.Views
             public override Color CheckSelectedBackground { get { return Color.FromArgb(99, 99, 99); } }
         }
 
-                
+
         /// <summary>
         /// Handle to the MainWindowController for this view
         /// </summary>
@@ -155,6 +155,11 @@ namespace VisiBoole.Views
 
             if (displayType == DisplayType.EDIT && DesignController.ActiveDesign != null)
             {
+                if (DesignController.ActiveDesign.Font.Size != Properties.Settings.Default.FontSize)
+                {
+                    MainWindowController.SetFontSize();
+                }
+
                 undoToolStripMenuItem.Enabled = DesignController.ActiveDesign.EditHistory.Count > 0;
                 undoToolStripMenuItem1.Enabled = DesignController.ActiveDesign.EditHistory.Count > 0;
                 redoToolStripMenuItem.Enabled = DesignController.ActiveDesign.UndoHistory.Count > 0;
@@ -391,7 +396,6 @@ namespace VisiBoole.Views
         private void ColorblindModeMenuClick(object sender, EventArgs e)
         {
             Properties.Settings.Default.Colorblind = !Properties.Settings.Default.Colorblind; // Flip setting
-
             if (editModeToggle.Enabled)
             {
                 MainWindowController.RefreshOutput();
@@ -406,6 +410,10 @@ namespace VisiBoole.Views
         private void SimulatorCommentsMenuClick(object sender, EventArgs e)
         {
             Properties.Settings.Default.SimulationComments = !Properties.Settings.Default.SimulationComments; // Flip setting
+            if (editModeToggle.Enabled)
+            {
+                MainWindowController.RefreshOutput();
+            }
         }
 
         /// <summary>
@@ -512,8 +520,12 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void NavTree_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
         {
-            MainWindowController.SwitchDisplay();
-            MainWindowController.SelectFile(e.Node.Name);
+            if (editModeToggle.Enabled)
+            {
+                MainWindowController.LoadDisplay(DisplayType.EDIT);
+                MainWindowController.ClearParsers();
+            }
+            MainWindowController.SelectFile(e.Node.Name, true);
         }
 
         /// <summary>
@@ -534,7 +546,8 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void EditButtonClick(object sender, EventArgs e)
         {
-            MainWindowController.SwitchDisplay();
+            MainWindowController.LoadDisplay(DisplayType.EDIT);
+            MainWindowController.ClearParsers();
         }
 
         /// <summary>
@@ -618,9 +631,12 @@ namespace VisiBoole.Views
             hw.Show();
         }
 
-        private void SwitchDisplay()
+        private void CheckToAddOpenFileLink()
         {
-            if ()
+            if (NavTree.Nodes[0].Nodes.Count == 0)
+            {
+                MainWindowController.LoadDisplay(DisplayType.EDIT);
+            }
         }
 
         /// <summary>
@@ -631,6 +647,7 @@ namespace VisiBoole.Views
         private void CloseFileMenuClick(object sender, EventArgs e)
         {
             MainWindowController.CloseActiveFile();
+            CheckToAddOpenFileLink();
         }
 
         /// <summary>
@@ -651,6 +668,7 @@ namespace VisiBoole.Views
         private void CloseAllMenuClick(object sender, EventArgs e)
         {
             MainWindowController.CloseFiles();
+            CheckToAddOpenFileLink();
         }
 
         /// <summary>
@@ -754,6 +772,7 @@ namespace VisiBoole.Views
             SetTheme(Properties.Settings.Default.Theme);
             colorBlindModeToolStripMenuItem.Checked = Properties.Settings.Default.Colorblind;
             simulationCommentsToolStripMenuItem.Checked = Properties.Settings.Default.SimulationComments;
+            toggleSimulatorSemicolonsToolStripMenuItem.Checked = Properties.Settings.Default.OutputSemicolons;
         }
 
         #endregion
@@ -766,15 +785,24 @@ namespace VisiBoole.Views
         private void userGuideToolStripMenuItem_Click(object sender, EventArgs e)
         {
             TutorialWindow tutorial = new TutorialWindow();
-            
+
             tutorial.Show();
-            
+
         }
 
         private void aboutToolStripMenuItem_Click(object sender, EventArgs e)
         {
             HelpWindow about = new HelpWindow("About VisiBoole", File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "Resources", "Help Documentation", "About.txt")));
             about.Show();
+        }
+
+        private void toggleSimulatorSemicolonsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.OutputSemicolons = !Properties.Settings.Default.OutputSemicolons; // Flip setting
+            if (editModeToggle.Enabled)
+            {
+                MainWindowController.RefreshOutput();
+            }
         }
     }
 }

@@ -252,8 +252,26 @@ namespace VisiBoole.ParsingEngine
 
         #region Parsing Methods
 
-        #region Alternate Clock Methods
+        #region Clock Methods
 
+        /// <summary>
+        /// Update all clock statements' next values
+        /// </summary>
+        private void UpdateClocks()
+        {
+            foreach (Statement stmt in Statements)
+            {
+                if (stmt.GetType() == typeof(DffClockStmt))
+                {
+                    DffClockStmt clockStmt = ((DffClockStmt)stmt);
+                    if (clockStmt.Clock == null)
+                    {
+                        clockStmt.Update();
+                    }
+                }
+            }
+        }
+        
         /// <summary>
         /// Ticks statements with alt clocks that go from off to on.
         /// </summary>
@@ -274,21 +292,12 @@ namespace VisiBoole.ParsingEngine
                                 DffClockStmt clockStmt = ((DffClockStmt)stmt);
                                 if (clockStmt.Clock == kv.Key)
                                 {
-                                    IEnumerable<string> variables = clockStmt.Tick();
-                                    if (variables != null)
-                                    {
-                                        updateList.AddRange(variables);
-                                    }
+                                    clockStmt.Tick();
                                 }
                             }
                         }
                     }
                 }
-            }
-
-            if (updateList.Count > 0)
-            {
-                Design.Database.ProcessUpdate(updateList);
             }
         }
 
@@ -345,12 +354,15 @@ namespace VisiBoole.ParsingEngine
                 ErrorListBox.Display(GetErrorLog());
                 return null;
             }
+
+            Design.Database.EvaluateExpressions();
             if (!TryRunSubmodules())
             {
                 return null;
             }
 
             // Get output
+            UpdateClocks();
             Design.Database.UpdateAltClocks();
             return GetParsedOutput();
         }
@@ -373,10 +385,10 @@ namespace VisiBoole.ParsingEngine
                 variables = WhitespaceRegex.Split(variableName.Substring(1));
                 Design.Database.SetValues(variables, value);
             }
-            Design.Database.ProcessUpdate(variables);
-            TickAltClocks();
-            Design.Database.UpdateAltClocks();
             TryRunSubmodules();
+            TickAltClocks();
+            UpdateClocks();
+            Design.Database.UpdateAltClocks();
 
             // Get output
             return GetParsedOutput();
@@ -389,7 +401,6 @@ namespace VisiBoole.ParsingEngine
         public List<IObjectCodeElement> ParseTick()
         {
             // Tick clock statements
-            List<string> updateList = new List<string>();
             foreach (Statement stmt in Statements)
             {
                 if (stmt.GetType() == typeof(DffClockStmt))
@@ -397,18 +408,14 @@ namespace VisiBoole.ParsingEngine
                     DffClockStmt clockStmt = ((DffClockStmt)stmt);
                     if (clockStmt.Clock == null)
                     {
-                        IEnumerable<string> variables = clockStmt.Tick();
-                        if (variables != null)
-                        {
-                            updateList.AddRange(variables);
-                        }
+                        clockStmt.Tick();
                     }
                 }
             }
-            Design.Database.ProcessUpdate(updateList);
-            TickAltClocks();
-            Design.Database.UpdateAltClocks();
             TryRunSubmodules();
+            TickAltClocks();
+            UpdateClocks();
+            Design.Database.UpdateAltClocks();
 
             // Get output
             return GetParsedOutput();
@@ -419,7 +426,7 @@ namespace VisiBoole.ParsingEngine
         /// </summary>
         /// <param name="inputs">Input variables</param>
         /// <returns>Parsed output</returns>
-        public List<IObjectCodeElement> ParseWithInput(List<Variable> inputs, bool isSubdesign = false)
+        public List<IObjectCodeElement> ParseWithInput(List<Variable> inputs)
         {
             // Get statements for parsing
             Design.Database = new Database();
@@ -434,12 +441,15 @@ namespace VisiBoole.ParsingEngine
                 ErrorListBox.Display(GetErrorLog());
                 return null;
             }
+
+            Design.Database.EvaluateExpressions();
             if (!TryRunSubmodules())
             {
                 ErrorListBox.Display(GetErrorLog());
                 return null;
             }
 
+            UpdateClocks();
             Design.Database.UpdateAltClocks();
             // Get output
             return GetParsedOutput();
@@ -484,11 +494,14 @@ namespace VisiBoole.ParsingEngine
                 ErrorListBox.Display(new List<string>(new string[] { $"Error parsing design '{Design.FileName}'. Please check/run your source file for errors." }));
                 return null;
             }
+
+            Design.Database.EvaluateExpressions();
             if (!TryRunSubmodules())
             {
                 ErrorListBox.Display(GetErrorLog());
                 return null;
             }
+            UpdateClocks();
             Design.Database.UpdateAltClocks();
 
             // Get output values
@@ -562,16 +575,21 @@ namespace VisiBoole.ParsingEngine
                         return null;
                     }
 
-                    // For all characteres after the semicolon index
-                    for (int i = semicolonIndex + 1; i < line.Length; i++)
+                    if (semicolonIndex + 1 < line.Length)
                     {
-                        // If the character is not an empty space
-                        if (line[i] != ' ')
+                        // For all characteres after the semicolon index
+                        for (int i = semicolonIndex + 1; i < line.Length; i++)
                         {
-                            // Add multiple statements on line error to error log
-                            ErrorLog.Add(CurrentLineNumber, "Only one statement can appear on a line.");
-                            return null;
+                            // If the character is not an empty space
+                            if (line[i] != ' ')
+                            {
+                                // Add multiple statements on line error to error log
+                                ErrorLog.Add(CurrentLineNumber, "Only one statement can appear on a line.");
+                                return null;
+                            }
                         }
+
+                        line = line.TrimEnd();
                     }
 
                     // If current statement is empty

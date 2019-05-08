@@ -27,11 +27,11 @@ using VisiBoole.Models;
 
 namespace VisiBoole.Views
 {
-	/// <summary>
-	/// The no-split input display that is hosted by the MainWindow
-	/// </summary>
-	public partial class DisplayEdit : UserControl, IDisplay
-	{
+    /// <summary>
+    /// The no-split input display that is hosted by the MainWindow
+    /// </summary>
+    public partial class DisplayEdit : UserControl, IDisplay
+    {
         /// <summary>
         /// Controller for this display.
         /// </summary>
@@ -71,6 +71,8 @@ namespace VisiBoole.Views
 		public void AttachTabControl(NewTabControl tabControl)
         {
             TabControl = tabControl;
+            pnlMain.Controls.Add(TabControl, 0, 0);
+            TabControl.Dock = DockStyle.Fill;
         }
 
         private TabPage FindTab(string name)
@@ -153,6 +155,7 @@ namespace VisiBoole.Views
                 {
                     TabPage tabPage = FindTab(designName);
                     tabPage.Text = isDirty ? $"*{designName}" : designName;
+                    Controller.LoadDisplay(DisplayType.EDIT);
                 };
 
                 TabControl.TabPages.Add(newTabPage);
@@ -164,6 +167,8 @@ namespace VisiBoole.Views
                 existingTabPage.Controls.Add(design);
                 design.Dock = DockStyle.Fill;
             }
+
+            pnlMain.Focus();
         }
     }
 }

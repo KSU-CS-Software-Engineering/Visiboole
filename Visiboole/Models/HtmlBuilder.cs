@@ -84,12 +84,17 @@ namespace VisiBoole.Models
                     currentLine += "<br>";
                 }
 
+                bool outputSemicolons = Properties.Settings.Default.OutputSemicolons;
                 foreach (IObjectCodeElement token in line)
                 {
                     if (token is Comment)
                     {
                         // Add coloring tags to comment
                         currentLine += ColorComment(token.ObjCodeText);
+                        continue;
+                    }
+                    else if (!outputSemicolons && token is Operator && token.ObjCodeText == ";")
+                    {
                         continue;
                     }
 

@@ -25,10 +25,10 @@ using VisiBoole.Controllers;
 
 namespace VisiBoole.Views
 {
-	/// <summary>
-	/// Exposes methods for the four displays hosted by the MainWindow
-	/// </summary>
-	public interface IDisplay
+    /// <summary>
+    /// Exposes methods for the four displays hosted by the MainWindow
+    /// </summary>
+    public interface IDisplay
     {
         /// <summary>
         /// Returns the type of this display

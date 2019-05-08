@@ -26,11 +26,11 @@ using VisiBoole.Controllers;
 
 namespace VisiBoole.Views
 {
-	/// <summary>
-	/// The horizontally-split display that is hosted by the MainWindow
-	/// </summary>
-	public partial class DisplayRun: UserControl, IDisplay
-	{
+    /// <summary>
+    /// The horizontally-split display that is hosted by the MainWindow
+    /// </summary>
+    public partial class DisplayRun : UserControl, IDisplay
+    {
         /// <summary>
         /// Controller for this display.
         /// </summary>
@@ -41,17 +41,22 @@ namespace VisiBoole.Views
         /// </summary>
         private NewTabControl TabControl;
 
-		/// <summary>
-		/// Type of this display.
-		/// </summary>
-		public DisplayType DisplayType { get { return DisplayType.RUN; } }
+        /// <summary>
+        /// Html output template for the browser
+        /// </summary>
+        private string OutputTemplate = "<html><head><style type=\"text/css\"> p { margin: 0;} </style></head><body>{0}</body></html>";
 
-		/// <summary>
-		/// Constucts an instance of DisplaySingleOutput
-		/// </summary>
-		public DisplayRun()
-		{
-			InitializeComponent();
+        /// <summary>
+        /// Type of this display.
+        /// </summary>
+        public DisplayType DisplayType { get { return DisplayType.RUN; } }
+
+        /// <summary>
+        /// Constucts an instance of DisplaySingleOutput
+        /// </summary>
+        public DisplayRun()
+        {
+            InitializeComponent();
         }
 
         /// <summary>
@@ -70,6 +75,9 @@ namespace VisiBoole.Views
 		public void AttachTabControl(NewTabControl tabControl)
         {
             TabControl = tabControl;
+            pnlMain.Controls.Add(pnlOutputControls, 0, 0);
+            pnlMain.Controls.Add(TabControl, 0, 1);
+            TabControl.Dock = DockStyle.Fill;
         }
 
         /// <summary>
@@ -125,7 +133,7 @@ namespace VisiBoole.Views
         public void AddTabComponent(string name, object component)
         {
             string designName = name;
-            WebBrowser browser = (WebBrowser)component;
+            string html = (string)component;
 
             TabPage existingTabPage = null;
             foreach (TabPage tabPage in TabControl.TabPages)
@@ -142,6 +150,38 @@ namespace VisiBoole.Views
                 TabPage newTabPage = new TabPage(name);
                 newTabPage.Text = name;
                 newTabPage.ToolTipText = $"{name}.vbi";
+
+                // Init browser
+                WebBrowser browser = new WebBrowser();
+                browser.IsWebBrowserContextMenuEnabled = false;
+                browser.AllowWebBrowserDrop = false;
+                browser.WebBrowserShortcutsEnabled = false;
+                browser.ObjectForScripting = Controller;
+                // Create browser with empty body
+                browser.DocumentText = OutputTemplate.Replace("{0}", html);
+                browser.PreviewKeyDown += (sender, eventArgs) => {
+                    if (eventArgs.Control)
+                    {
+                        if (eventArgs.KeyCode == Keys.E)
+                        {
+                            Controller.LoadDisplay(DisplayType.EDIT);
+                        }
+                        else if (eventArgs.KeyCode == Keys.Add || eventArgs.KeyCode == Keys.Oemplus)
+                        {
+                            Properties.Settings.Default.FontSize += 2;
+                            Controller.RefreshOutput();
+                        }
+                        else if (eventArgs.KeyCode == Keys.Subtract || eventArgs.KeyCode == Keys.OemMinus)
+                        {
+                            if (Properties.Settings.Default.FontSize > 9)
+                            {
+                                Properties.Settings.Default.FontSize -= 2;
+                                Controller.RefreshOutput();
+                            }
+                        }
+                    }
+                };
+
                 newTabPage.Controls.Add(browser);
                 browser.Dock = DockStyle.Fill;
                 TabControl.TabPages.Add(newTabPage);
@@ -149,9 +189,8 @@ namespace VisiBoole.Views
             }
             else
             {
-                existingTabPage.Controls.Clear();
-                existingTabPage.Controls.Add(browser);
-                browser.Dock = DockStyle.Fill;
+                ((WebBrowser)existingTabPage.Controls[0]).Document.Body.InnerHtml = html;
+                TabControl.SelectedTab = existingTabPage;
             }
 
             pnlMain.Focus();

@@ -112,8 +112,17 @@ namespace VisiBoole.ParsingEngine.Statements
 
                         string binary = binaryBuilder.ToString();
                         char format = char.ToUpper(match.Groups["Format"].Value[0]);
-                        string output = format == 'B' ? binary : Format(format, binary);
+                        string output = format == 'B' ? binary : Format(format, binary);;
+                        int outputWidth = format == 'B' ? output.Length : GetWidth(format, variables.Length);
                         string nextOutput = clickable ? GetNextValue(binary) : null;
+
+                        if (output.Length < outputWidth)
+                        {
+                            for (int i = 0; i < outputWidth - output.Length; i++)
+                            {
+                                Output.Add(new SpaceFeed());
+                            }
+                        }
                         Output.Add(new Formatter(output, $"{{{variableList}", nextOutput));
                     }
                 }
@@ -141,6 +150,26 @@ namespace VisiBoole.ParsingEngine.Statements
             else
             {
                 return nextValue;
+            }
+        }
+
+        private int GetWidth(char format, int variableCount)
+        {
+            if (format == 'D')
+            {
+                return (int)Math.Pow(2, variableCount - 1).ToString().Length + 1;
+            }
+            else if (format == 'U')
+            {
+                return ((int)Math.Pow(2, variableCount) - 1).ToString().Length;
+            }
+            else if (format == 'H')
+            {
+                return (int)(double)Math.Ceiling(decimal.Divide(variableCount, 4));
+            }
+            else
+            {
+                return variableCount;
             }
         }
 
@@ -179,13 +208,15 @@ namespace VisiBoole.ParsingEngine.Statements
         {
             int value = 0;
 
-            int lastBitIndex = binary.Length - 1;
-            if (binary[lastBitIndex] == '1')
+            if (binary[0] == '1')
             {
-                value -= (int)Math.Pow(2, lastBitIndex);
+                value -= (int)Math.Pow(2, binary.Length - 1);
+                return (value + Convert.ToInt32(FormatUnsigned(string.Concat('0', binary.Substring(1))))).ToString();
             }
-
-            return (value + Convert.ToInt32(FormatUnsigned(binary.Substring(0, lastBitIndex)))).ToString();
+            else
+            {
+                return FormatUnsigned(binary);
+            }
         }
 
         /// <summary>

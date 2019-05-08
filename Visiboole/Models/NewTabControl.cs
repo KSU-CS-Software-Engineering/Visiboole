@@ -190,7 +190,14 @@ namespace CustomTabControl
                 {
                     TabPage closingTabPage = TabPages[clickedIndex];
                     TabClosing?.Invoke(closingTabPage);
-                    SelectedIndex = SelectedIndex != 0 ? SelectedIndex - 1 : SelectedIndex + 1;
+                    if (TabPages.Count > 1)
+                    {
+                        SelectedIndex = SelectedIndex != 0 ? SelectedIndex - 1 : SelectedIndex + 1;
+                    }
+                    else
+                    {
+                        SelectedIndex = -1;
+                    }
                     TabPages.RemoveAt(clickedIndex);
                     TabClosed?.Invoke(closingTabPage, new TabClosedEventArgs(TabPages.Count));
                 }
@@ -217,7 +224,7 @@ namespace CustomTabControl
             {
                 return;
             }
-            
+
             // Get clicked tab
             TabPage clickedTab = (TabPage)Tag;
             int clickedIndex = TabPages.IndexOf(clickedTab);
@@ -299,7 +306,7 @@ namespace CustomTabControl
                 if (GetTabRect(i).Contains(PointToClient(Cursor.Position)))
                 {
                     return i;
-                }  
+                }
             }
 
             return -1;

@@ -46,38 +46,28 @@ namespace VisiBoole.Controllers
     /// Handles the logic, and communication with other objects for the displays hosted by the MainWindow
     /// </summary>
 	[PermissionSet(SecurityAction.Demand, Name = "FullTrust")]
-	[System.Runtime.InteropServices.ComVisibleAttribute(true)]
-	public class DisplayController : IDisplayController
-	{
-		/// <summary>
-		/// No-split input view that is hosted by the MainWindow
-		/// </summary>
-		private IDisplay EditDisplay;
+    [System.Runtime.InteropServices.ComVisibleAttribute(true)]
+    public class DisplayController : IDisplayController
+    {
+        /// <summary>
+        /// No-split input view that is hosted by the MainWindow
+        /// </summary>
+        private IDisplay EditDisplay;
 
-		/// <summary>
-		/// Horizontal-split view that is hosted by the MainWindow
-		/// </summary>
-		private IDisplay RunDisplay;
+        /// <summary>
+        /// Horizontal-split view that is hosted by the MainWindow
+        /// </summary>
+        private IDisplay RunDisplay;
 
-		/// <summary>
-		/// Handle to the controller for the MainWindow
-		/// </summary>
-		private IMainWindowController MainWindowController;
+        /// <summary>
+        /// Handle to the controller for the MainWindow
+        /// </summary>
+        private IMainWindowController MainWindowController;
 
         /// <summary>
         /// HTMLBuilder for the web browser.
         /// </summary>
         private HtmlBuilder HtmlBuilder;
-
-		/// <summary>
-		/// The WebBrowser that shows the output that is shared amongst the displays that are hosted by the MainWindow
-		/// </summary>
-		private WebBrowser Browser;
-
-        /// <summary>
-        /// Html output template for the browser
-        /// </summary>
-        private string OutputTemplate = "<html><head><style type=\"text/css\"> p { margin: 0;} </style></head><body>{0}</body></html>";
 
         /// <summary>
         /// Last output of the browser.
@@ -91,10 +81,10 @@ namespace VisiBoole.Controllers
         /// </summary>
         public IDisplay PreviousDisplay { get; set; }
 
-		/// <summary>
-		/// The display that is currently hosted by the MainWindow
-		/// </summary>
-		public IDisplay CurrentDisplay { get; set; }
+        /// <summary>
+        /// The display that is currently hosted by the MainWindow
+        /// </summary>
+        public IDisplay CurrentDisplay { get; set; }
 
         /// <summary>
         /// Constructs an instance of DisplayController with a handle to the two displays.
@@ -102,9 +92,9 @@ namespace VisiBoole.Controllers
         /// <param name="editDisplay">Handle to the edit display hosted by the MainWindow</param>
         /// <param name="runDisplay">Handle to the run display hosted by the MainWindow</param>
         public DisplayController(IDisplay editDisplay, IDisplay runDisplay)
-		{
+        {
             // Init tab control
-			var designTabControl = new NewTabControl();
+            var designTabControl = new NewTabControl();
             designTabControl.Font = new Font("Segoe UI", 10.75F);
             designTabControl.SelectedTabColor = Color.DodgerBlue;
             designTabControl.TabBoundaryColor = Color.Black;
@@ -115,7 +105,10 @@ namespace VisiBoole.Controllers
                 MainWindowController.LoadDisplay(DisplayType.EDIT);
             };
             designTabControl.TabClosing += (sender) => {
-                MainWindowController.CloseActiveFile();
+                if (DesignController.ActiveDesign != null)
+                {
+                    MainWindowController.CloseActiveFile(false);
+                }
             };
             designTabControl.TabSwap += (sender, e) => {
                 MainWindowController.SwapDesignNodes(e.SourceTabPageIndex, e.DestinationTabPageIndex);
@@ -129,48 +122,22 @@ namespace VisiBoole.Controllers
             browserTabControl.SelectedIndexChanged += (sender, e) => {
                 if (browserTabControl.SelectedIndex != -1)
                 {
-                    MainWindowController.SelectParser(browserTabControl.TabPages[browserTabControl.SelectedIndex].Name);
+                    MainWindowController.SelectParser(browserTabControl.TabPages[browserTabControl.SelectedIndex].Text);
                 }
             };
             browserTabControl.TabClosing += (sender) => {
-                MainWindowController.CloseParser(((TabPage)sender).Name);
+                MainWindowController.CloseParser(((TabPage)sender).Text);
             };
             browserTabControl.TabClosed += (sender, e) => {
                 if (e.TabPagesCount == 0)
                 {
-                    SwitchDisplay();
+                    MainWindowController.LoadDisplay(DisplayType.EDIT);
                 }
-            };
-
-            // Init browser
-            Browser = new WebBrowser();
-            Browser.IsWebBrowserContextMenuEnabled = false;
-            Browser.AllowWebBrowserDrop = false;
-            Browser.WebBrowserShortcutsEnabled = false;
-            Browser.ObjectForScripting = this;
-            // Create browser with empty body
-            Browser.DocumentText = OutputTemplate.Replace("{0}", "");
-            Browser.PreviewKeyDown += (sender, eventArgs) => {
-                if (eventArgs.Control)
+                foreach (TreeNode treeNode in InstantiationClicks.Nodes)
                 {
-                    if (eventArgs.KeyCode == Keys.E)
+                    if (treeNode.Text.Split('.')[0] == ((TabPage)sender).Text)
                     {
-                        MainWindowController.LoadDisplay(DisplayType.EDIT);
-                    }
-                    else if (eventArgs.KeyCode == Keys.Add || eventArgs.KeyCode == Keys.Oemplus)
-                    {
-                        Properties.Settings.Default.FontSize += 2;
-                        MainWindowController.SetFontSize();
-                        MainWindowController.RefreshOutput();
-                    }
-                    else if (eventArgs.KeyCode == Keys.Subtract || eventArgs.KeyCode == Keys.OemMinus)
-                    {
-                        if (Properties.Settings.Default.FontSize > 9)
-                        {
-                            Properties.Settings.Default.FontSize -= 2;
-                            MainWindowController.SetFontSize();
-                            RefreshOutput();
-                        }
+                        InstantiationClicks.Nodes.Remove(treeNode);
                     }
                 }
             };
@@ -184,10 +151,10 @@ namespace VisiBoole.Controllers
             EditDisplay = editDisplay;
             EditDisplay.AttachTabControl(designTabControl);
 
-			RunDisplay = runDisplay;
+            RunDisplay = runDisplay;
             RunDisplay.AttachTabControl(browserTabControl);
 
-			CurrentDisplay = editDisplay;
+            CurrentDisplay = editDisplay;
         }
 
         /// <summary>
@@ -195,8 +162,8 @@ namespace VisiBoole.Controllers
         /// </summary>
         /// <param name="mainWindowController"></param>
         public void AttachMainWindowController(IMainWindowController mainWindowController)
-		{
-			MainWindowController = mainWindowController;
+        {
+            MainWindowController = mainWindowController;
         }
 
         /// <summary>
@@ -217,6 +184,15 @@ namespace VisiBoole.Controllers
         }
 
         /// <summary>
+        /// Loads into the MainWindow the display of the given type
+        /// </summary>
+        /// <param name="dType">The type of display that should be loaded</param>
+        public void LoadDisplay(DisplayType dType)
+        {
+            MainWindowController.LoadDisplay(dType);
+        }
+
+        /// <summary>
 		/// Selects the tab page with the provided name.
 		/// </summary>
 		/// <param name="name">Name of tabpage to select</param>
@@ -228,21 +204,27 @@ namespace VisiBoole.Controllers
         /// <summary>
 		/// Creates a new tab on the design tab control.
 		/// </summary>
-		/// <param name="design">The Design that is displayed in the new tab</param>
-		/// <returns>Returns true if a new tab was successfully created</returns>
+		/// <param name="design">Design that is to be displayed in a tab</param>
 		public void CreateDesignTab(Design design)
         {
             CurrentDisplay.AddTabComponent(design.FileName, design);
         }
 
         /// <summary>
-        /// Closes a specific tab in the tab control.
+        /// Closes a specific tab in the design tab control.
         /// </summary>
         /// <param name="designName">Name of the design being closed</param>
-        /// <returns>Whether the operation was successful</returns>
         public void CloseDesignTab(string name)
         {
             CurrentDisplay.CloseTab(name);
+        }
+
+        /// <summary>
+        /// Sets the theme of edit and run tab control
+        /// </summary>
+        public void SetTheme()
+        {
+            CurrentDisplay.SetTheme();
         }
 
         /// <summary>
@@ -252,15 +234,12 @@ namespace VisiBoole.Controllers
         /// <param name="position">Scroll position of the Browser</param>
 		public void DisplayOutput(List<IObjectCodeElement> output, int position = 0)
         {
-            //Browser.ObjectForScripting = this;
-            Browser.Document.Body.ScrollTop = position;
-            Browser.Document.Body.InnerHtml = HtmlBuilder.GetHTML(output);
-
             if (CurrentDisplay is DisplayEdit)
             {
                 MainWindowController.LoadDisplay(DisplayType.RUN);
                 InstantiationClicks = new TreeNode();
             }
+            CurrentDisplay.AddTabComponent(DesignController.ActiveDesign.FileName, HtmlBuilder.GetHTML(output));
 
             LastOutput = output;
         }
@@ -270,16 +249,7 @@ namespace VisiBoole.Controllers
         /// </summary>
         public void RefreshOutput()
         {
-            //Browser.ObjectForScripting = this;
-            DisplayOutput(LastOutput, Browser.Document.Body.ScrollTop);
-        }
-
-        /// <summary>
-        /// Switches the display to the edit mode.
-        /// </summary>
-        public void SwitchDisplay()
-        {
-            MainWindowController.LoadDisplay(DisplayType.EDIT);
+            DisplayOutput(LastOutput);
         }
 
         /// <summary>
@@ -288,12 +258,9 @@ namespace VisiBoole.Controllers
         /// <param name="count">Number of times to tick</param>
         public void Tick(int count)
         {
-            //Browser.ObjectForScripting = this;
-            int position = Browser.Document.Body.ScrollTop;
-
             for (int i = 0; i < count; i++)
             {
-                DisplayOutput(MainWindowController.Tick(), position);
+                DisplayOutput(MainWindowController.Tick());
             }
         }
 
@@ -304,8 +271,7 @@ namespace VisiBoole.Controllers
         /// <param name="value">Value for formatter click</param>
         public void Variable_Click(string variableName, string value = null)
         {
-            //Browser.ObjectForScripting = this;
-            DisplayOutput(MainWindowController.Variable_Click(variableName, value), Browser.Document.Body.ScrollTop);
+            DisplayOutput(MainWindowController.Variable_Click(variableName, value));
             if (InstantiationClicks.Nodes.Count > 0)
             {
                 foreach (TreeNode node in InstantiationClicks.Nodes)
@@ -346,38 +312,7 @@ namespace VisiBoole.Controllers
                 return;
             }
 
-            WebBrowser subBrowser = new WebBrowser();
-            subBrowser.IsWebBrowserContextMenuEnabled = false;
-            subBrowser.AllowWebBrowserDrop = false;
-            subBrowser.WebBrowserShortcutsEnabled = false;
-            subBrowser.ObjectForScripting = this;
-            subBrowser.DocumentText = OutputTemplate.Replace("{0}", HtmlBuilder.GetHTML(output, true));
-            subBrowser.PreviewKeyDown += (sender, eventArgs) => {
-                if (eventArgs.Control)
-                {
-                    if (eventArgs.KeyCode == Keys.E)
-                    {
-                        MainWindowController.LoadDisplay(DisplayType.EDIT);
-                    }
-                    else if (eventArgs.KeyCode == Keys.Add || eventArgs.KeyCode == Keys.Oemplus)
-                    {
-                        Properties.Settings.Default.FontSize += 2;
-                        MainWindowController.SetFontSize();
-                        MainWindowController.RefreshOutput();
-                    }
-                    else if (eventArgs.KeyCode == Keys.Subtract || eventArgs.KeyCode == Keys.OemMinus)
-                    {
-                        if (Properties.Settings.Default.FontSize > 9)
-                        {
-                            Properties.Settings.Default.FontSize -= 2;
-                            MainWindowController.SetFontSize();
-                            RefreshOutput();
-                        }
-                    }
-                }
-            };
-
-            CurrentDisplay.AddTabComponent(instantiation.Split('.')[0], subBrowser);
+            CurrentDisplay.AddTabComponent(instantiation.Split('.')[0], HtmlBuilder.GetHTML(output, true));
         }
     }
 }
