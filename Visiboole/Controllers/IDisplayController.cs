@@ -59,6 +59,8 @@ namespace VisiBoole.Controllers
         /// <param name="dType">The type of display that should be loaded</param>
         void LoadDisplay(DisplayType dType);
 
+        void RetrieveFocus();
+
         /// <summary>
 		/// Selects the tab page with the provided name.
 		/// </summary>
@@ -91,8 +93,7 @@ namespace VisiBoole.Controllers
         /// Displays the provided output to the browser.
         /// </summary>
         /// <param name="output">Output of the parsed design</param>
-        /// <param name="position">Scroll position of the browser</param>
-        void DisplayOutput(List<IObjectCodeElement> output, int position = 0);
+        void DisplayOutput(List<IObjectCodeElement> output);
 
         /// <summary>
         /// Handles the event that occurs when the browser needs to be refreshed.

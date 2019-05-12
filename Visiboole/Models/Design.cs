@@ -70,7 +70,7 @@ namespace VisiBoole.Models
         /// <summary>
         /// Module declaration of the design. (if exists)
         /// </summary>
-        public string ModuleDeclaration { get; set; }
+        public string HeaderLine { get; set; }
 
         /// <summary>
         /// Constructs a new Design object
@@ -192,7 +192,7 @@ namespace VisiBoole.Models
                                 {
                                     if (ModuleRegex.IsMatch(currentStatement))
                                     {
-                                        ModuleDeclaration = currentStatement;
+                                        HeaderLine = currentStatement;
                                     }
                                     else
                                     {

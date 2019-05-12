@@ -30,7 +30,7 @@ namespace VisiBoole.ParsingEngine.Statements
     /// <summary>
     /// An instance creation statement that creates an instance of design that has defined a module.
     /// </summary>
-	public class SubmoduleInstantiationStmt : Statement
+	public class InstantiationStmt : Statement
 	{
         /// <summary>
         /// Regex for getting output tokens.
@@ -52,7 +52,7 @@ namespace VisiBoole.ParsingEngine.Statements
         /// </summary>
         /// <param name="text">Text of the statement</param>
         /// <param name="subdesign">Subdesign of instantiation</param>
-		public SubmoduleInstantiationStmt(string text, Design subdesign) : base(text)
+		public InstantiationStmt(string text, Design subdesign) : base(text)
 		{
             Subdesign = subdesign;
             NoContactValues = new List<bool>();
@@ -90,6 +90,7 @@ namespace VisiBoole.ParsingEngine.Statements
             }
 
             int outputValueIndex = 0;
+            NoContactValues = new List<bool>();
             matches = Parser.VariableRegex.Matches(outputSideText);
             foreach (Match match in matches)
             {
@@ -105,16 +106,15 @@ namespace VisiBoole.ParsingEngine.Statements
                 outputValueIndex++;
             }
 
-            
-
             return true;
         }
 
         /// <summary>
         /// Parses the text of this statement into a list of output elements.
         /// </summary>
-        public override void Parse()
+        public override List<IObjectCodeElement> Parse()
         {
+            List<IObjectCodeElement> output = new List<IObjectCodeElement>();
             int seperatorIndex = Text.IndexOf(':');
             int currentNoContactIndex = 0;
             MatchCollection matches = OutputRegex.Matches(Text);
@@ -123,35 +123,49 @@ namespace VisiBoole.ParsingEngine.Statements
                 string token = match.Value;
                 if (token == " ")
                 {
-                    Output.Add(new SpaceFeed());
+                    output.Add(new SpaceFeed());
                 }
                 else if (token == "\n")
                 {
                     // Output newline
-                    Output.Add(new LineFeed());
+                    output.Add(new LineFeed());
                 }
                 else if (token.Contains("("))
                 {
-                    Output.Add(new Instantiation(token));
+                    output.Add(new Instantiation(token));
                 }
                 else if (token == "," || token == "{" || token == "}" || token == ":" || token == ")")
                 {
-                    OutputOperator(token);
+                    output.Add(new Operator(token));
                 }
                 else
                 {
                     if (match.Index > seperatorIndex && token == "NC")
                     {
-                        Output.Add(new DependentVariable(token, NoContactValues[currentNoContactIndex++]));
+                        output.Add(new DependentVariable(token, NoContactValues[currentNoContactIndex++]));
                     }
                     else
                     {
-                        OutputVariable(token);
+                        IndependentVariable indVar = DesignController.ActiveDesign.Database.TryGetVariable<IndependentVariable>(token) as IndependentVariable;
+                        DependentVariable depVar = DesignController.ActiveDesign.Database.TryGetVariable<DependentVariable>(token) as DependentVariable;
+                        if (indVar != null)
+                        {
+                            output.Add(indVar);
+                        }
+                        else if (depVar != null)
+                        {
+                            output.Add(depVar);
+                        }
                     }
                 }
             }
 
-            base.Parse();
+            // Output ending semicolon
+            output.Add(new Operator(";"));
+            // Output new line
+            output.Add(new LineFeed());
+            // Return output list
+            return output;
         }
 	}
 }

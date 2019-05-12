@@ -31,16 +31,6 @@ namespace VisiBoole.Models
 {
     public class HtmlBuilder
 	{
-        /// <summary>
-        /// Color of true variables.
-        /// </summary>
-        private string TrueColor;
-
-        /// <summary>
-        /// Color of false variables.
-        /// </summary>
-        private string FalseColor;
-
         private List<List<IObjectCodeElement>> PreParseHTML(List<IObjectCodeElement> output)
         {
             List<List<IObjectCodeElement>> fullText = new List<List<IObjectCodeElement>>();
@@ -71,13 +61,11 @@ namespace VisiBoole.Models
         {
             string html = "";
             string currentLine = "";
-            TrueColor = "'crimson'";
-            FalseColor = (Properties.Settings.Default.Colorblind) ? "'royalblue'" : "'green'";
             List<List<IObjectCodeElement>> newOutput = PreParseHTML(output);
 
             foreach (List<IObjectCodeElement> line in newOutput)
             {
-                currentLine = "<p style=\"font-family:consolas; font-size:" + Properties.Settings.Default.FontSize + "pt\">";
+                currentLine = "<p style=\"font-size:@SIZE@pt;\">";
 
                 if (line.Count == 0)
                 {
@@ -85,8 +73,10 @@ namespace VisiBoole.Models
                 }
 
                 bool outputSemicolons = Properties.Settings.Default.OutputSemicolons;
-                foreach (IObjectCodeElement token in line)
+                for (int i = 0; i < line.Count; i++)
                 {
+                    IObjectCodeElement token = line[i];
+
                     if (token is Comment)
                     {
                         // Add coloring tags to comment
@@ -103,76 +93,54 @@ namespace VisiBoole.Models
                     bool hasNegation = token.ObjHasNegation;
                     Type varType = token.GetType();
 
-                    string template = "<font color={0} style=\"cursor: {1};{2}\"{3}>{4}</font>";
+                    string color = "";
+                    string cursor = "";
+                    string decoration = "";
+                    string action = "";
+                    bool fontTag = false;
+                    string template = "<font {0} {1} {2} {3}>{4}</font>";
+
                     if (value == null)
                     {
-                        if (variable == "&nbsp;")
+                        if (varType == typeof(Formatter))
                         {
-                            currentLine += variable;
+                            fontTag = true;
+                            Formatter formatter = (Formatter)token;
+                            color = "color=\"black\"";
+                            cursor = formatter.NextValue != null && !isSubdesign ? "style=\"cursor:hand\"" : "style=\"cursor:no-drop\"";
+                            action = $"onclick=\"window.external.Variable_Click('{formatter.Variables}', '{formatter.NextValue}')\"";
                         }
-                        else
+                        else if (varType == typeof(Instantiation))
                         {
-                            bool isInstantiation = varType == typeof(Instantiation);
-                            bool isFormatter = varType == typeof(Formatter);
-                            Formatter formatter = null;
-                            if (isFormatter)
-                            {
-                                formatter = (Formatter)token;
-                            }
-
-                            string color = "'black'";
-
-                            string cursor;
-                            if (isInstantiation)
-                            {
-                                cursor = "hand";
-                            }
-                            else if (isFormatter)
-                            {
-                                cursor = formatter.NextValue != null && !isSubdesign ? "hand" : "no-drop";
-                            }
-                            else
-                            {
-                                cursor = "text";
-                            }
-
-                            string decoration = "";
-
-                            string action;
-                            if (isInstantiation)
-                            {
-                                action = $" onclick=\"window.external.Instantiation_Click('{variable}')\"";
-                            }
-                            else if (formatter != null && !isSubdesign)
-                            {
-                                action = $" onclick=\"window.external.Variable_Click('{formatter.Variables}', '{formatter.NextValue}')\"";
-                            }
-                            else
-                            {
-                                action = "";
-                            }
-
-                            currentLine += string.Format(template, color, cursor, decoration, action, variable);
+                            fontTag = true;
+                            color = "color=\"black\"";
+                            cursor = "style=\"cursor:hand\"";
+                            action = $"onclick=\"window.external.Instantiation_Click('{variable}')\"";
                         }
                     }
                     else
                     {
-                        bool isIndependentVariable = varType == typeof(IndependentVariable);
-                        string color;
+                        fontTag = true;
                         if (!hasNegation)
                         {
-                            color = ((bool)value) ? TrueColor : FalseColor;
+                            color = ((bool)value) ? $"color=\"@TRUE@\"" : $"color=\"@FALSE@\"";
                         }
                         else
                         {
-                            color = ((bool)value) ? FalseColor : TrueColor;
+                            color = ((bool)value) ? $"color=\"@FALSE@\"" : $"color=\"@TRUE@\"";
                         }
+                        cursor = varType == typeof(IndependentVariable) && !isSubdesign ? "style=\"cursor:hand;" : "style=\"cursor:no-drop;";
+                        decoration = hasNegation ? " text-decoration: overline;\"" : " \"";
+                        action = cursor[14] == 'h' ? $"onclick=\"window.external.Variable_Click('{variable}')\"" : "";
+                    }
 
-                        string cursor = isIndependentVariable && !isSubdesign ? "hand" : "no-drop";
-                        string decoration = hasNegation ? " text-decoration: overline;" : "";
-                        string action = cursor[0] == 'h' ? $" onclick=\"window.external.Variable_Click('{variable}')\"" : "";
-
+                    if (fontTag)
+                    {
                         currentLine += string.Format(template, color, cursor, decoration, action, variable);
+                    }
+                    else
+                    {
+                        currentLine += variable;
                     }
                 }
 
@@ -231,14 +199,18 @@ namespace VisiBoole.Models
                     // Check for true or false color
                     if (color.Equals("true", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        color = TrueColor.Replace("'", "");
+                        color = "@TRUE@";
+                        isValidColor = true;
                     }
                     else if (color.Equals("false", StringComparison.InvariantCultureIgnoreCase))
                     {
-                        color = FalseColor.Replace("'", "");
+                        color = "@FALSE@";
+                        isValidColor = true;
                     }
-
-                    isValidColor = IsValidHTMLColor(color); // Check whether the provided color is valid
+                    else
+                    {
+                        isValidColor = IsValidHTMLColor(color); // Check whether the provided color is valid
+                    }
 
                     if (isValidColor)
                     {
@@ -246,7 +218,7 @@ namespace VisiBoole.Models
                         {
                             commentHTML.Append("</font>"); // Append closing color tag
                         }
-                        commentHTML.Append($"<font color='{color}'>"); // Append color tag
+                        commentHTML.Append($"<font color=\"{color}\">"); // Append color tag
                         coloring = true;
                     }
                     else

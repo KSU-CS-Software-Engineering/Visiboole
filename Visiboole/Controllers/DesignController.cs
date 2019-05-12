@@ -326,10 +326,14 @@ namespace VisiBoole.Controllers
 
             string designName = instantiation.Split('.')[0];
             string instantName = instantiation.Split('.')[1].TrimEnd('(');
-            Design subDesign = Parsers[ActiveDesign.FileName].Subdesigns[designName];
+            Design subDesign = ActiveParser.Subdesigns[designName];
+            if (!Designs.ContainsKey(designName))
+            {
+                Designs.Add(designName, subDesign);
+            }
 
             // Get input variables
-            List<Variable> inputVariables = Parsers[ActiveDesign.FileName].GetModuleInputs(instantName, subDesign.ModuleDeclaration);
+            List<Variable> inputVariables = ActiveParser.GetModuleInputs(instantName, subDesign.HeaderLine);
 
             // Parse sub design
             ActiveDesign = subDesign;
@@ -363,6 +367,7 @@ namespace VisiBoole.Controllers
         public void ClearParsers()
         {
             Parsers.Clear();
+            ActiveParser = null;
         }
 
         /// <summary>

@@ -81,6 +81,7 @@ namespace VisiBoole.Controllers
             DisplayController.PreviousDisplay = DisplayController.CurrentDisplay;
             DisplayController.CurrentDisplay = DisplayController.GetDisplayOfType(dType);
             MainWindow.LoadDisplay(DisplayController.PreviousDisplay, DisplayController.CurrentDisplay);
+            SetTheme();
         }
 
         /// <summary>
@@ -157,22 +158,24 @@ namespace VisiBoole.Controllers
             Design currentDesign = DesignController.GetActiveDesign();
             // Get current design's name
             string currentDesignName = currentDesign.FileName;
-            // Get content of current design
-            string content = currentDesign.Text;
 
-            // Write content of current design to new design
-            File.WriteAllText(Path.ChangeExtension(path, ".vbi"), content);
-            // Create new design
-            Design newDesign = DesignController.CreateDesign(path);
-
-            // Close old design
-            DesignController.CloseDesign(currentDesignName, false);
-            // Update tab with new design
-            DisplayController.CreateDesignTab(newDesign);
-            // Update node with new design
-            MainWindow.UpdateNavTreeNode(currentDesignName, newDesign.FileName);
-            // Display success
-            SaveFileSuccess(true);
+            if (currentDesignName == Path.GetFileNameWithoutExtension(path))
+            {
+                SaveFile(currentDesignName);
+            }
+            else
+            {
+                // Write content of current design to new design
+                File.WriteAllText(Path.ChangeExtension(path, ".vbi"), currentDesign.Text);
+                // Create new design
+                Design newDesign = DesignController.CreateDesign(path);
+                // Create design tab with new design
+                DisplayController.CreateDesignTab(newDesign);
+                // Add node with new design
+                MainWindow.AddNavTreeNode(newDesign.FileName);
+                // Display success
+                SaveFileSuccess(true);
+            }
         }
 
         /// <summary>

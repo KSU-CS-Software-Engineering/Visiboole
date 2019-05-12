@@ -17,16 +17,10 @@ namespace CustomTabControl
     public delegate void TabSwapEventHandler(object sender, TabSwapEventArgs eventArgs);
 
     /// <summary>
-    /// Delegate for tab closing events.
-    /// </summary>
-    /// <param name="sender"></param>
-    public delegate void TabClosingEventHandler(object sender);
-
-    /// <summary>
     /// Delegate for tab closed events.
     /// </summary>
     /// <param name="sender"></param>
-    public delegate void TabClosedEventHandler(object sender, TabClosedEventArgs eventArgs);
+    public delegate void TabClosedEventHandler(object sender, EventArgs eventArgs);
 
     /// <summary>
     /// Event arguments for a tab swap event
@@ -55,37 +49,12 @@ namespace CustomTabControl
         }
     }
 
-    /// <summary>
-    /// Event arguments for a tab swap event
-    /// </summary>
-    public class TabClosedEventArgs : EventArgs
-    {
-        /// <summary>
-        /// Index of the location of the tab being swapped.
-        /// </summary>
-        public int TabPagesCount { get; private set; }
-
-        /// <summary>
-        /// Constructs a TabClosedEventArgs with the new tab pages count.
-        /// </summary>
-        /// <param name="tabPagesCount">Number of tab pages</param>
-        public TabClosedEventArgs(int tabPagesCount)
-        {
-            TabPagesCount = tabPagesCount;
-        }
-    }
-
     public class NewTabControl : TabControl
     {
         /// <summary>
-        /// Event that occurs when two tab pages are being swapped.
+        /// Event that occurs when two tab pages are swapped.
         /// </summary>
-        public event TabSwapEventHandler TabSwap;
-
-        /// <summary>
-        /// Event that occurs just before a tab page is removed.
-        /// </summary>
-        public event TabClosingEventHandler TabClosing;
+        public event TabSwapEventHandler TabSwapped;
 
         /// <summary>
         /// Event that occurs when a tab page is removed.
@@ -189,17 +158,8 @@ namespace CustomTabControl
                 if (close.Contains(e.Location))
                 {
                     TabPage closingTabPage = TabPages[clickedIndex];
-                    TabClosing?.Invoke(closingTabPage);
-                    if (TabPages.Count > 1)
-                    {
-                        SelectedIndex = SelectedIndex != 0 ? SelectedIndex - 1 : SelectedIndex + 1;
-                    }
-                    else
-                    {
-                        SelectedIndex = -1;
-                    }
                     TabPages.RemoveAt(clickedIndex);
-                    TabClosed?.Invoke(closingTabPage, new TabClosedEventArgs(TabPages.Count));
+                    TabClosed?.Invoke(closingTabPage, new EventArgs());
                 }
             }
         }
@@ -322,12 +282,10 @@ namespace CustomTabControl
             // Swap tab indexes
             int srcIndex = TabPages.IndexOf(srcTab);
             int dstIndex = TabPages.IndexOf(dstTab);
-
-            TabSwap?.Invoke(this, new TabSwapEventArgs(srcIndex, dstIndex));
-
             TabPages[dstIndex] = srcTab;
             TabPages[srcIndex] = dstTab;
 
+            TabSwapped?.Invoke(this, new TabSwapEventArgs(srcIndex, dstIndex));
             Refresh();
         }
     }

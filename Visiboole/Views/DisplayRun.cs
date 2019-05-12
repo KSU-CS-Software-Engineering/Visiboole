@@ -32,6 +32,16 @@ namespace VisiBoole.Views
     public partial class DisplayRun : UserControl, IDisplay
     {
         /// <summary>
+        /// Event that occurs when the display tab is changed.
+        /// </summary>
+        public event DisplayTabChangeEventHandler DisplayTabChanged;
+
+        /// <summary>
+        /// Event that occurs when the display tab is closed.
+        /// </summary>
+        public event DisplayTabChangeEventHandler DisplayTabClosed;
+
+        /// <summary>
         /// Controller for this display.
         /// </summary>
         private IDisplayController Controller;
@@ -40,11 +50,6 @@ namespace VisiBoole.Views
         /// Tab control for this display.
         /// </summary>
         private NewTabControl TabControl;
-
-        /// <summary>
-        /// Html output template for the browser
-        /// </summary>
-        private string OutputTemplate = "<html><head><style type=\"text/css\"> p { margin: 0;} </style></head><body>{0}</body></html>";
 
         /// <summary>
         /// Type of this display.
@@ -75,6 +80,13 @@ namespace VisiBoole.Views
 		public void AttachTabControl(NewTabControl tabControl)
         {
             TabControl = tabControl;
+            tabControl.SelectedIndexChanged += (sender, eventArgs) => {
+                string tabName = tabControl.SelectedIndex != -1 ? tabControl.TabPages[TabControl.SelectedIndex].Text : null;
+                DisplayTabChanged?.Invoke(tabName);
+            };
+            tabControl.TabClosed += (sender, eventArgs) => {
+                DisplayTabClosed?.Invoke(((TabPage) sender).Text);
+            };
             pnlMain.Controls.Add(pnlOutputControls, 0, 0);
             pnlMain.Controls.Add(TabControl, 0, 1);
             TabControl.Dock = DockStyle.Fill;
@@ -119,7 +131,10 @@ namespace VisiBoole.Views
         /// </summary>
         public void CloseTabs()
         {
-            TabControl.TabPages.Clear();
+            for (int i = 0; i < TabControl.TabCount; i++)
+            {
+                TabControl.TabPages.RemoveAt(0);
+            }
         }
 
         /// <summary>
@@ -134,13 +149,30 @@ namespace VisiBoole.Views
         }
 
         /// <summary>
+        /// Creates the document text from the body html.
+        /// </summary>
+        /// <param name="html">Body html of the document</param>
+        /// <returns>Document text</returns>
+        private string CreateDocumentText(string html)
+        {
+            string falseColor = Properties.Settings.Default.Colorblind ? "royalblue" : "green";
+            html = html.Replace("\"@TRUE@\"", "\"crimson\"").Replace("\"@FALSE@\"", $"\"{falseColor}\"").Replace("@SIZE@pt", $"{Properties.Settings.Default.FontSize}pt");
+            return "<html><head><meta name=\"viewport\" content=\"initial-scale=1.0, user-scalable=no\" />"
+            + "<style type=\"text/css\"> p {{ margin: 0; font-family: consolas; } </style>"
+            + "<script>function KeyPress(e) { var evtobj = window.event? event : e; if (evtobj.ctrlKey &&"
+            + "(evtobj.keyCode == 187 || evtobj.keyCode == 189 || evtobj.keyCode == 107 || evtobj.keyCode == 109"
+            + "|| evtobj.keyCode == 61 || evtobj.keyCode == 173)) { e.preventDefault(); } }</script></head><body>"
+            + html + "</body></html>";
+        }
+
+        /// <summary>
         /// Adds/updates a tab page with the provided name and the provided component.
         /// </summary>
         /// <param name="name">Name of the tab page to add or update</param>
         /// <param name="component">Component to add or update</param>
-        public void AddTabComponent(string name, object component)
+        /// <param name="swap">Whether to swap to the new component</param>
+        public void AddTabComponent(string name, object component, bool swap = true)
         {
-            string designName = name;
             string html = (string)component;
 
             TabPage existingTabPage = null;
@@ -157,7 +189,7 @@ namespace VisiBoole.Views
             {
                 TabPage newTabPage = new TabPage(name);
                 newTabPage.Text = name;
-                newTabPage.ToolTipText = $"{name}.vbi";
+                newTabPage.ToolTipText = name;
 
                 // Init browser
                 WebBrowser browser = new WebBrowser();
@@ -166,13 +198,13 @@ namespace VisiBoole.Views
                 browser.WebBrowserShortcutsEnabled = false;
                 browser.ObjectForScripting = Controller;
                 // Create browser with empty body
-                browser.DocumentText = OutputTemplate.Replace("{0}", html);
+                browser.DocumentText = CreateDocumentText(html);
                 browser.PreviewKeyDown += (sender, eventArgs) => {
                     if (eventArgs.Control)
                     {
                         if (eventArgs.KeyCode == Keys.E)
                         {
-                            Controller.LoadDisplay(DisplayType.EDIT);
+                            CloseTabs();
                         }
                         else if (eventArgs.KeyCode == Keys.Add || eventArgs.KeyCode == Keys.Oemplus)
                         {
@@ -189,16 +221,28 @@ namespace VisiBoole.Views
                         }
                     }
                 };
+                browser.DocumentCompleted += (sender, eventArgs) => {
+                    browser.Document.Body.DoubleClick += (sender2, eventArgs2) => {
+                        Controller.RetrieveFocus();
+                    };
+                };
 
                 newTabPage.Controls.Add(browser);
                 browser.Dock = DockStyle.Fill;
                 TabControl.TabPages.Add(newTabPage);
-                TabControl.SelectedTab = newTabPage;
+                if (swap)
+                {
+                    TabControl.SelectedTab = newTabPage;
+                }
             }
             else
             {
-                ((WebBrowser)existingTabPage.Controls[0]).Document.Body.InnerHtml = html;
-                TabControl.SelectedTab = existingTabPage;
+                WebBrowser browser = ((WebBrowser)existingTabPage.Controls[0]);
+                browser.Document.Body.InnerHtml = html;
+                if (swap)
+                {
+                    TabControl.SelectedTab = existingTabPage;
+                }
             }
 
             pnlMain.Focus();
@@ -211,7 +255,9 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void btnTick_Click(object sender, System.EventArgs e)
         {
+            Cursor = Cursors.WaitCursor;
             Controller.Tick(1);
+            Cursor = Cursors.Default;
         }
 
         /// <summary>
@@ -221,7 +267,9 @@ namespace VisiBoole.Views
         /// <param name="e"></param>
         private void btnMultiTick_Click(object sender, System.EventArgs e)
         {
+            Cursor = Cursors.WaitCursor;
             Controller.Tick(Convert.ToInt32(numericUpDown1.Value));
+            Cursor = Cursors.Default;
         }
     }
 }

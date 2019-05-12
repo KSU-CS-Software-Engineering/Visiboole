@@ -238,18 +238,6 @@ namespace VisiBoole.Views
         }
 
         /// <summary>
-        /// Updates the provided nav tree node with a new name.
-        /// </summary>
-        /// <param name="oldName">Name of node</param>
-        /// <param name="newName">New name of node</param>
-        public void UpdateNavTreeNode(string oldName, string newName)
-        {
-            int index = NavTree.Nodes[0].Nodes.IndexOfKey(oldName);
-            NavTree.Nodes[0].Nodes[index].Name = newName;
-            NavTree.Nodes[0].Nodes[index].Text = newName;
-        }
-
-        /// <summary>
         /// Removes a node in the TreeView
         /// </summary>
         /// <param name="name">The name of the node to be removed</param>

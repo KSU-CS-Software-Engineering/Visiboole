@@ -56,7 +56,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Pattern for identifying scalars. (Optional *)
         /// </summary>
-        private static readonly string ScalarPattern2 = $@"(?<!([%.']))(\*?{ScalarPattern})(?![.(])";
+        private static readonly string ScalarPattern2 = $@"(?<!([%.']))(\*?{ScalarPattern})(?!\.)";
 
         /// <summary>
         /// Pattern for identifying vectors. (Optional *)
@@ -261,13 +261,10 @@ namespace VisiBoole.ParsingEngine
         {
             foreach (Statement stmt in Statements)
             {
-                if (stmt.GetType() == typeof(DffClockStmt))
+                if (stmt.GetType() == typeof(ClockAssignmentStmt))
                 {
-                    DffClockStmt clockStmt = ((DffClockStmt)stmt);
-                    if (clockStmt.Clock == null)
-                    {
-                        clockStmt.Update();
-                    }
+                    ClockAssignmentStmt clockStmt = ((ClockAssignmentStmt)stmt);
+                    clockStmt.Update();
                 }
             }
         }
@@ -287,9 +284,9 @@ namespace VisiBoole.ParsingEngine
                     {
                         foreach (Statement stmt in Statements)
                         {
-                            if (stmt.GetType() == typeof(DffClockStmt))
+                            if (stmt.GetType() == typeof(ClockAssignmentStmt))
                             {
-                                DffClockStmt clockStmt = ((DffClockStmt)stmt);
+                                ClockAssignmentStmt clockStmt = ((ClockAssignmentStmt)stmt);
                                 if (clockStmt.Clock == kv.Key)
                                 {
                                     clockStmt.Tick();
@@ -313,9 +310,7 @@ namespace VisiBoole.ParsingEngine
             List<IObjectCodeElement> output = new List<IObjectCodeElement>();
             foreach (Statement statement in Statements)
             {
-                statement.Parse(); // Parse output
-                output.AddRange(statement.Output); // Add output
-                statement.Output = new List<IObjectCodeElement>(); // Clear output
+                output.AddRange(statement.Parse()); // Add output
             }
 
             return output;
@@ -329,9 +324,9 @@ namespace VisiBoole.ParsingEngine
         {
             foreach (Statement statement in Statements)
             {
-                if (statement.GetType() == typeof(SubmoduleInstantiationStmt))
+                if (statement.GetType() == typeof(InstantiationStmt))
                 {
-                    SubmoduleInstantiationStmt submodule = (SubmoduleInstantiationStmt)statement;
+                    InstantiationStmt submodule = (InstantiationStmt)statement;
                     if (!submodule.TryRunInstance())
                     {
                         return false;
@@ -403,9 +398,9 @@ namespace VisiBoole.ParsingEngine
             // Tick clock statements
             foreach (Statement stmt in Statements)
             {
-                if (stmt.GetType() == typeof(DffClockStmt))
+                if (stmt.GetType() == typeof(ClockAssignmentStmt))
                 {
-                    DffClockStmt clockStmt = ((DffClockStmt)stmt);
+                    ClockAssignmentStmt clockStmt = ((ClockAssignmentStmt)stmt);
                     if (clockStmt.Clock == null)
                     {
                         clockStmt.Tick();
@@ -466,13 +461,13 @@ namespace VisiBoole.ParsingEngine
             Design.Database = new Database();
 
             // Check design for valid module declaration
-            if (Design.ModuleDeclaration == null || !Regex.IsMatch(Design.ModuleDeclaration, ModulePattern))
+            if (Design.HeaderLine == null || !Regex.IsMatch(Design.HeaderLine, ModulePattern))
             {
-                ErrorListBox.Display(new List<string>(new string[] { $"Unable to locate a valid module declaration inside design '{Design.FileName}'. Please check your source file for errors." }));
+                ErrorListBox.Display(new List<string>(new string[] { $"The module file '{Design.FileName}' did not contain a matching module statement." }));
                 return null;
             }
 
-            Match moduleMatch = Regex.Match(Design.ModuleDeclaration, ModulePattern);
+            Match moduleMatch = Regex.Match(Design.HeaderLine, ModulePattern);
 
             // Set input values
             int inputValuesIndex = 0;
@@ -491,7 +486,7 @@ namespace VisiBoole.ParsingEngine
             Statements = ParseStatements();
             if (Statements == null)
             {
-                ErrorListBox.Display(new List<string>(new string[] { $"Error parsing design '{Design.FileName}'. Please check/run your source file for errors." }));
+                ErrorListBox.Display(new List<string>(new string[] { $"Error parsing design '{Design.FileName}'. Please check/run that design file independently for errors." }));
                 return null;
             }
 
@@ -571,7 +566,7 @@ namespace VisiBoole.ParsingEngine
                     if (string.Concat(currentStatement, line.Substring(0, line.IndexOf(';'))).All(c => c == ' ' || c == '\n'))
                     {
                         // Add empty statement termination error to error log
-                        ErrorLog.Add(CurrentLineNumber, "';' cannot end empty statements.");
+                        ErrorLog.Add(CurrentLineNumber, "';' can not be used to end comment or null statements.");
                         return null;
                     }
 
@@ -637,7 +632,7 @@ namespace VisiBoole.ParsingEngine
             // Create valid bool
             bool valid = true;
             // Start module declaration string
-            Design.ModuleDeclaration = null;
+            Design.HeaderLine = null;
             // Start line number counter
             CurrentLineNumber = 0;
             // Declare statement type
@@ -682,7 +677,7 @@ namespace VisiBoole.ParsingEngine
                     }
                 }
                 // If statement type is submodule
-                else if (type == StatementType.Submodule)
+                else if (type == StatementType.Instantiation)
                 {
                     // If submodule instantiation isn't valid and the current execution is valid
                     if (!VerifySubmoduleStatement(statement) && valid)
@@ -692,19 +687,19 @@ namespace VisiBoole.ParsingEngine
                     }
                 }
                 // If statement type is module
-                else if (type == StatementType.Module)
+                else if (type == StatementType.Header)
                 {
                     // If design doesn't have a module declaration
-                    if (Design.ModuleDeclaration == null)
+                    if (Design.HeaderLine == null)
                     {
                         // Set the design's module declaration to the source
-                        Design.ModuleDeclaration = statement;
+                        Design.HeaderLine = statement;
                     }
                     // If design has a module module declaration
                     else
                     {
                         // Add invalid module statement error to error list
-                        ErrorLog.Add(CurrentLineNumber, $"Designs can only have one module declaration statement.");
+                        ErrorLog.Add(CurrentLineNumber, $"Designs can only have one module header statement.");
                         // If current execution is valid
                         if (valid)
                         {
@@ -783,10 +778,27 @@ namespace VisiBoole.ParsingEngine
                         // If line needs to be initialized and we are unable to init the line
                         if (needsInit && !InitSource(line, source.Type))
                         {
-                            // Set valid to false
-                            valid = false;
-                            // End expanded source iterations
-                            break;
+                            if (source.Type == StatementType.Header || source.Type == StatementType.Instantiation)
+                            {
+                                if (!InitSource(line.Substring(line.IndexOf('(')), source.Type))
+                                {
+                                    // Set valid to false
+                                    valid = false;
+                                    // End expanded source iterations
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                if (!InitSource(line, source.Type))
+                                {
+                                    // Set valid to false
+                                    valid = false;
+                                    // End expanded source iterations
+                                    break;
+                                }
+
+                            }
                         }
                         // If able to init line
                         else
@@ -854,7 +866,7 @@ namespace VisiBoole.ParsingEngine
                 else if (source.Type == StatementType.Empty)
                 {
                     // Add empty statement to statement list
-                    statements.Add(new EmptyStmt(source.Text));
+                    statements.Add(new EmptyStmt());
                 }
                 // If the source statement type is a comment statement
                 else if (source.Type == StatementType.Comment)
@@ -871,36 +883,36 @@ namespace VisiBoole.ParsingEngine
                     }
                 }
                 // If the source statement type is a boolean statement
-                else if (source.Type == StatementType.Boolean)
+                else if (source.Type == StatementType.Assignment)
                 {
                     // Add boolean statement to statement list
                     statements.Add(new BooleanAssignmentStmt(source.Text));
                 }
                 // If the source statement type is a clock statement
-                else if (source.Type == StatementType.Clock)
+                else if (source.Type == StatementType.ClockAssignment)
                 {
                     // Add clock statement to statement list
-                    statements.Add(new DffClockStmt(source.Text));
+                    statements.Add(new ClockAssignmentStmt(source.Text));
                 }
-                // If the source statement type is a format specifier statement
-                else if (source.Type == StatementType.Display)
+                // If the source statement type is a variable display statement
+                else if (source.Type == StatementType.VariableDisplay)
                 {
                     // Add format specifier statement to statement list
-                    statements.Add(new DisplayStmt(source.Text));
+                    statements.Add(new VariableDisplayStmt(source.Text));
                 }
-                // If the source statement type is a module statement
-                else if (source.Type == StatementType.Module)
+                // If the source statement type is a header statement
+                else if (source.Type == StatementType.Header)
                 {
                     // Add module declaration statement to statement list
-                    statements.Add(new ModuleDeclarationStmt(source.Text));
+                    statements.Add(new HeaderStmt(source.Text));
                 }
                 // If the source statement type is a submodule statement
-                else if (source.Type == StatementType.Submodule)
+                else if (source.Type == StatementType.Instantiation)
                 {
                     // Get module instantiation match
                     Match match = ModuleInstantiationRegex.Match(source.Text);
                     // Add submodule instantiation statement to statement list
-                    statements.Add(new SubmoduleInstantiationStmt(source.Text, Subdesigns[match.Groups["Design"].Value]));
+                    statements.Add(new InstantiationStmt(source.Text, Subdesigns[match.Groups["Design"].Value]));
                 }
             }
 
@@ -943,13 +955,13 @@ namespace VisiBoole.ParsingEngine
                 }
                 else
                 {
-                    ErrorLog.Add(CurrentLineNumber, $"Library '{path}' doesn't exist.");
+                    ErrorLog.Add(CurrentLineNumber, $"Library named '{path}' doesn't exist. Please check your library name.");
                     return false;
                 }
             }
             catch (Exception)
             {
-                ErrorLog.Add(CurrentLineNumber, $"Invalid library name '{library}'.");
+                ErrorLog.Add(CurrentLineNumber, $"An error has occured while locating the library named'{library}'. Please check your library name.");
                 return false;
             }
         }
@@ -980,19 +992,19 @@ namespace VisiBoole.ParsingEngine
             }
 
             string designName = instantiationMatch.Groups["Design"].Value;
-            Match match = Regex.Match(Subdesigns[designName].ModuleDeclaration, $@"^\s*{designName}\({ModulePattern}\);$");
+            Match match = Regex.Match(Subdesigns[designName].HeaderLine, $@"^\s*{designName}\({ModulePattern}\);$");
             int i = 0;
 
             string[] declarationInputVars = CommaSeperatingRegex.Split(match.Groups["Inputs"].Value);
             if (instantiationInputVars.Length != declarationInputVars.Length)
             {
-                ErrorLog.Add(CurrentLineNumber, $"Instantiation '{instantiation}' doesn't have the same number of input variables as the matching module declaration.");
+                ErrorLog.Add(CurrentLineNumber, $"Instantiation doesn't have the same number of input variables as the matching module declaration.");
                 return false;
             }
             string[] declarationOutputVars = CommaSeperatingRegex.Split(match.Groups["Outputs"].Value);
             if (instantiationOutputVars.Length != declarationOutputVars.Length)
             {
-                ErrorLog.Add(CurrentLineNumber, $"Instantiation '{instantiation}' doesn't have the same number of output variables as the matching module declaration.");
+                ErrorLog.Add(CurrentLineNumber, $"Instantiation doesn't have the same number of output variables as the matching module declaration.");
                 return false;
             }
 
@@ -1000,7 +1012,7 @@ namespace VisiBoole.ParsingEngine
             {
                 if (instantiationVars[i++].Count != GetExpansion(AnyTypeRegex.Match(inputVar)).Count)
                 {
-                    ErrorLog.Add(CurrentLineNumber, $"Instantiation '{instantiation}' doesn't have the same number of input variables as the matching module declaration.");
+                    ErrorLog.Add(CurrentLineNumber, $"Instantiation doesn't have the same number of input variables as the matching module declaration.");
                     return false;
                 }
             }
@@ -1009,7 +1021,7 @@ namespace VisiBoole.ParsingEngine
             {
                 if (instantiationVars[i++].Count != GetExpansion(AnyTypeRegex.Match(outputVar)).Count)
                 {
-                    ErrorLog.Add(CurrentLineNumber, $"Instantiation '{instantiation}' doesn't have the same number of output variables as the matching module declaration.");
+                    ErrorLog.Add(CurrentLineNumber, $"Instantiation doesn't have the same number of output variables as the matching module declaration.");
                     return false;
                 }
             }
@@ -1073,23 +1085,23 @@ namespace VisiBoole.ParsingEngine
                 // Get whether the variable is a dependent
                 string dependent;
                 if (variableMatch.Index < dependentSeperatorIndex
-                    || (type == StatementType.Submodule && variableMatch.Index > moduleSeperatorIndex))
+                    || (type == StatementType.Instantiation && variableMatch.Index > moduleSeperatorIndex))
                 {
-                    dependent = type == StatementType.Clock ? $"{variable}.d" : variable;
+                    dependent = type == StatementType.ClockAssignment ? $"{variable}.d" : variable;
                 }
                 else
                 {
                     dependent = string.Empty;
                 }
 
-                if (type == StatementType.Submodule && dependent.Length != 0 && variableMatch.Value == "NC")
+                if (type == StatementType.Instantiation && dependent.Length != 0 && variableMatch.Value == "NC")
                 {
                     continue;
                 }
 
                 // If statement type is boolean or submodule
-                // Readd  || type == StatementType.Submodule
-                if (type == StatementType.Boolean || type == StatementType.Clock)
+                // Readd  || type == StatementType.Instantiation
+                if (type == StatementType.Assignment || type == StatementType.ClockAssignment)
                 {
                     if (dependent.Length == 0)
                     {
@@ -1097,7 +1109,7 @@ namespace VisiBoole.ParsingEngine
                         if (dependents.Contains(variable))
                         {
                             // Circular dependency error
-                            ErrorLog.Add(GetLineNumber(source, variableMatch.Index), $"{variable} cannot depend on itself.");
+                            ErrorLog.Add(GetLineNumber(source, variableMatch.Index), $"Combinational circular dependency error: '{variable}' cannot depend on itself.");
                             return false;
                         }
 
@@ -1113,7 +1125,7 @@ namespace VisiBoole.ParsingEngine
                         if (Design.Database.HasDependencyList(dependent))
                         {
                             // Already dependent error
-                            ErrorLog.Add(GetLineNumber(source, variableMatch.Index), $"{variable} can only be assigned to the value of one expression.");
+                            ErrorLog.Add(GetLineNumber(source, variableMatch.Index), $"{variable} was previously assigned a value.");
                             return false;
                         }
 
@@ -1140,7 +1152,7 @@ namespace VisiBoole.ParsingEngine
                     // If variable isn't dependent
                     if (dependent.Length == 0)
                     {
-                        if (type == StatementType.Module && variableMatch.Index < moduleSeperatorIndex)
+                        if (type == StatementType.Header && variableMatch.Index < moduleSeperatorIndex)
                         {
                             // Add variable to the database
                             Design.Database.AddVariable(new IndependentVariable(variable, value), true);
@@ -1154,7 +1166,7 @@ namespace VisiBoole.ParsingEngine
                     // If variable is dependent
                     else
                     {
-                        if (type != StatementType.Clock)
+                        if (type != StatementType.ClockAssignment)
                         {
                             // Add variable to the database
                             Design.Database.AddVariable(new DependentVariable(variable, value));
@@ -1170,12 +1182,12 @@ namespace VisiBoole.ParsingEngine
                 else
                 {
                     // If variable is dependent, in the database not as a dependent
-                    if (type != StatementType.Clock && dependent.Length != 0 && Design.Database.TryGetVariable<DependentVariable>(variable) == null)
+                    if (type != StatementType.ClockAssignment && dependent.Length != 0 && Design.Database.TryGetVariable<DependentVariable>(variable) == null)
                     {
                         // Make variable in database a dependent
                         if (!Design.Database.MakeDependent(variable))
                         {
-                            ErrorLog.Add(GetLineNumber(source, variableMatch.Index), $"'{variable}' cannot be converted to a dependent variable because it is a module input.");
+                            ErrorLog.Add(GetLineNumber(source, variableMatch.Index), $"'{variable}' must be an independent variable to be used as an input in a module header statement.");
                             return false;
                         }
                     }
@@ -1194,7 +1206,7 @@ namespace VisiBoole.ParsingEngine
                 if (!Design.Database.TryAddDependencyList(dependent, dependencies))
                 {
                     // Circular dependency error
-                    ErrorLog.Add(GetLineNumber(source, source.IndexOf(dependent)), $"{dependent} cannot depend on itself.");
+                    ErrorLog.Add(GetLineNumber(source, source.IndexOf(dependent)), $"Combinational circular dependency error: '{dependent}' cannot depend on itself.");
                     return false;
                 }
             }
@@ -1213,7 +1225,7 @@ namespace VisiBoole.ParsingEngine
         {
             if (token.Value.Contains("[") && string.IsNullOrEmpty(token.Groups["LeftBound"].Value))
             {
-                List<string> components = Design.Database.GetComponents(token.Groups["Name"].Value);
+                List<string> components = Design.Database.GetVectorComponents(token.Groups["Name"].Value);
                 if (components == null)
                 {
                     return null;
@@ -1304,7 +1316,7 @@ namespace VisiBoole.ParsingEngine
             // Get whether the source needs to be expanded
             bool needsExpansion = ExpansionRegex.IsMatch(source) || source.Contains(':');
             // If source needs to be expanded, is an expression statement and is not a mathematical expression
-            if (needsExpansion && source.Contains("=") && !source.Contains("+") && !source.Contains("-"))
+            if (needsExpansion && source.Contains("=") && !source.Contains("+") && !source.Contains("-") && !source.Contains("=="))
             {
                 // Vertical expansion needed
                 source = ExpandVertically(source);
@@ -1349,7 +1361,7 @@ namespace VisiBoole.ParsingEngine
                 List<string> expansion = GetExpansion(match);
                 if (expansion == null)
                 {
-                    ErrorLog.Add(GetLineNumber(expandedLine, match.Index), $"'{match.Value}' is missing an explicit dimension.");
+                    ErrorLog.Add(GetLineNumber(expandedLine, match.Index), $"'{match.Value}' is missing an explicit dimension somewhere.");
                     return null;
                 }
                 if (expansion.Count > maxExpansionCount)
@@ -1391,7 +1403,7 @@ namespace VisiBoole.ParsingEngine
                     List<string> expansion = GetExpansion(match);
                     if (expansion == null)
                     {
-                        ErrorLog.Add(GetLineNumber(expandedLine, match.Index), $"'{match.Value}' is missing an explicit dimension.");
+                        ErrorLog.Add(GetLineNumber(expandedLine, match.Index), $"'{match.Value}' is missing an explicit dimension somewhere.");
                         return null;
                     }
                     if (expansion.Count > maxExpansionCount)
@@ -1419,16 +1431,13 @@ namespace VisiBoole.ParsingEngine
                     if (elementCount < maxExpansionCount)
                     {
                         // If variable list is the dependent
-                        if (match.Index < expandedLine.IndexOf('='))
+                        if (match.Index > expandedLine.IndexOf('='))
                         {
-                            ErrorLog.Add(GetLineNumber(expandedLine, match.Index), $"'{match.Value}' expansion count error.");
-                            return null;
-                        }
-
-                        // Add padding 0
-                        for (int i = 0; i < maxExpansionCount - elementCount; i++)
-                        {
-                            variableList = variableList.Insert(0, "0 ");
+                            // Add padding 0
+                            for (int i = 0; i < maxExpansionCount - elementCount; i++)
+                            {
+                                variableList = variableList.Insert(0, "0 ");
+                            }
                         }
                     }
 
@@ -1466,7 +1475,7 @@ namespace VisiBoole.ParsingEngine
                 // If expansion fails
                 if (dependentExpansion == null)
                 {
-                    ErrorLog.Add(GetLineNumber(line, dependentMatch.Index), $"'{dependent}' contains a [] notation that is missing an explicit dimension somewhere.");
+                    ErrorLog.Add(GetLineNumber(line, dependentMatch.Index), $"'{dependent}' contains a [] notation that is missing an explicit dimension.");
                     return null;
                 }
             }
@@ -1492,15 +1501,15 @@ namespace VisiBoole.ParsingEngine
             {
                 CurrentLineNumber = GetLineNumber(line, match.Index);
                 List<string> expansion;
-                bool canPad;
+                bool canAdjust;
                 if (!match.Value.Contains("{"))
                 {
-                    canPad = !match.Value.Contains("[") && string.IsNullOrEmpty(match.Groups["BitCount"].Value);
+                    canAdjust = !match.Value.Contains("[") && string.IsNullOrEmpty(match.Groups["BitCount"].Value);
                     expansion = ExpandToken(match);
                 }
                 else
                 {
-                    canPad = false;
+                    canAdjust = false;
                     expansion = GetExpansion(match);
                 }
 
@@ -1510,27 +1519,34 @@ namespace VisiBoole.ParsingEngine
                     return null;
                 }
 
-                if (canPad)
+                if (expansion.Count != dependentExpansion.Count)
                 {
-                    int paddingCount = dependentExpansion.Count - expansion.Count;
-                    for (int i = 0; i < paddingCount; i++)
+                    if (canAdjust)
                     {
-                        expansion.Insert(0, "0");
+                        int adjustCount = dependentExpansion.Count - expansion.Count;
+                        if (adjustCount > 0)
+                        {
+                            for (int i = 0; i < adjustCount; i++)
+                            {
+                                expansion.Insert(0, "0");
+                            }
+                        }
+                        else
+                        {
+                            for (int i = adjustCount; i < 0; i++)
+                            {
+                                expansion.RemoveAt(0);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        ErrorLog.Add(GetLineNumber(line, match.Index), $"Expansion size of '{match.Value}' doesn't match the size of '{dependent}'.");
+                        return null;
                     }
                 }
 
                 expressionExpansions.Add(expansion);
-            }
-
-            // Verify expansions
-            for (int i = 0; i < expressionExpansions.Count; i++)
-            {
-                List<string> expressionExpansion = expressionExpansions[i];
-                if (dependentExpansion.Count != expressionExpansion.Count)
-                {
-                    ErrorLog.Add(GetLineNumber(line, matches[i].Index), $"Expansion count of '{matches[i].Value}' doesn't match the expansion count of '{dependent}'.");
-                    return null;
-                }
             }
 
             // Combine expansions

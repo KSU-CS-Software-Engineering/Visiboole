@@ -87,7 +87,29 @@ namespace VisiBoole.Models
                 Delays = DesignController.ActiveDesign.Database.GetVariables(Delay);
                 Dependent = Delay + ".d";
                 Dependents = DesignController.ActiveDesign.Database.GetVariables(Dependent);
-                Expression = Expression.Substring(Expression.Substring(seperatorIndex).IndexOfAny(new char[] {' ', '\n'}) + seperatorIndex).Trim();
+
+                bool hasAltClock = false;
+                for (int i = seperatorIndex + 2; i < Expression.Length; i++)
+                {
+                    char currentChar = Expression[i];
+                    if (hasAltClock && (currentChar == ' ' || currentChar == '\n' || currentChar == '('))
+                    {
+                        Expression = Expression.Substring(i).Trim();
+                        break;
+                    }
+                    else if (!hasAltClock)
+                    {
+                        if (currentChar != '@')
+                        {
+                            Expression = Expression.Substring(i).Trim();
+                            break;
+                        }
+                        else
+                        {
+                            hasAltClock = true;
+                        }
+                    }
+                }
             }
 
             IsMathExpression = Expression.Any(c => c == '+' || c == '-');

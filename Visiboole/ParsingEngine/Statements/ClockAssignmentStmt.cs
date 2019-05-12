@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (C) 2019 John Devore
  * Copyright (C) 2019 Chance Henney, Juwan Moore, William Van Cleve
  * Copyright (C) 2017 Matthew Segraves, Zachary Terwort, Zachary Cleary
@@ -12,48 +12,77 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
+
  * You should have received a copy of the GNU General Public License
  * along with this program located at "\Visiboole\license.txt".
  * If not, see <http://www.gnu.org/licenses/>
  */
 
-using System.Linq;
-using System.Text.RegularExpressions;
 using System;
-using System.Text;
-using VisiBoole.Controllers;
-using VisiBoole.Models;
-using VisiBoole.ParsingEngine.ObjectCode;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Text.RegularExpressions;
+using VisiBoole.ParsingEngine.ObjectCode;
+using VisiBoole.Models;
+using VisiBoole.Controllers;
 
 namespace VisiBoole.ParsingEngine.Statements
 {
     /// <summary>
-    /// An expression statement that assigns the value of an expression to a dependent.
+    /// An expression statement that assigns the value of an expression to a dependent on a clock tick.
     /// </summary>
-	public class BooleanAssignmentStmt : Statement
-	{
+    public class ClockAssignmentStmt : Statement
+    {
         /// <summary>
         /// Regex for getting output tokens.
         /// </summary>
-        private Regex OutputRegex = new Regex($@"({Parser.ConstantPattern})|(~?{Parser.ScalarPattern})|(==)|[\s{{}}()=^|+-]");
+        private Regex OutputRegex = new Regex($@"{Parser.ConstantPattern}|(~?{Parser.ScalarPattern})|(==)|(<=)|[\s{{}}()@^|+-]");
 
         /// <summary>
-        /// Expression of the boolean statement.
+        /// Expression of the clock statement.
         /// </summary>
         private NamedExpression Expression;
 
         /// <summary>
-        /// Constructs a BooleanAssignemntStmt instance.
+        /// Next value of the clock statement.
+        /// </summary>
+        private string NextValue;
+
+        /// <summary>
+        /// Driving clock of statement. (if any)
+        /// </summary>
+        public string Clock;
+
+        /// <summary>
+        /// Constructs a DffClockStmt instance.
         /// </summary>
         /// <param name="text">Text of the statement</param>
-		public BooleanAssignmentStmt(string text) : base(text)
+        public ClockAssignmentStmt(string text) : base(text)
         {
             // Create expression with the provided text
             Expression = new NamedExpression(text);
+            // Get clock of expression
+            Clock = text.Contains("@") ? Regex.Match(text, @"(?<=@)\w+").Value : null;
             // Add expression to the database
-            DesignController.ActiveDesign.Database.AddExpression(Expression);
+            DesignController.ActiveDesign.Database.AddExpression(Expression, Clock);
+        }
+
+        /// <summary>
+        /// Updates the next value for the clock statement.
+        /// </summary>
+        public void Update()
+        {
+            NextValue = Expression.DependentBinary;
+        }
+
+        /// <summary>
+        /// Ticks the statement (delay value is set to its dependent value)
+        /// </summary>
+        public void Tick()
+        {
+            DesignController.ActiveDesign.Database.SetValues(Expression.Delays, NextValue);
         }
 
         /// <summary>
@@ -76,13 +105,12 @@ namespace VisiBoole.ParsingEngine.Statements
                 }
                 else if (token == "\n")
                 {
-                    // Output newline
                     output.Add(new LineFeed());
-                    needsSpace = true;
+                    needsSpace = false;
                 }
                 else
                 {
-                    if (needsSpace && token != ")" && token != "}")
+                    if (needsSpace && token != "@" && token != ")" && token != "}")
                     {
                         output.Add(new SpaceFeed());
                         needsSpace = false;
@@ -93,10 +121,23 @@ namespace VisiBoole.ParsingEngine.Statements
                         output.Add(Expression.Parentheses[match.Index]); // Output the corresponding parenthesis
                         needsSpace = false;
                     }
-                    else if (Parser.OperatorsList.Contains(token) || token == "{" || token == "}" || token == "=")
+                    else if (token[0] == '<')
+                    {
+                        // Output <= with dependent value
+                        if (!Expression.IsMathExpression)
+                        {
+                            output.Add(new DependentVariable("<=", NextValue.Contains('1')));
+                        }
+                        else
+                        {
+                            output.Add(new Operator(token));
+                        }
+                        needsSpace = true;
+                    }
+                    else if (Parser.OperatorsList.Contains(token) || token == "{" || token == "}" || token == "@")
                     {
                         output.Add(new Operator(token));
-                        needsSpace = token != "{";
+                        needsSpace = token != "@" && token != "{";
                     }
                     else
                     {

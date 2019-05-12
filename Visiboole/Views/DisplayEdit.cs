@@ -146,7 +146,8 @@ namespace VisiBoole.Views
         /// </summary>
         /// <param name="name">Name of the tab page to add or update</param>
         /// <param name="component">Component to add or update</param>
-        public void AddTabComponent(string name, object component)
+        /// <param name="swap">Whether to swap to the new component</param>
+        public void AddTabComponent(string name, object component, bool swap = false)
         {
             var design = (Design)component;
 
@@ -167,13 +168,20 @@ namespace VisiBoole.Views
                 };
 
                 TabControl.TabPages.Add(newTabPage);
-                TabControl.SelectedTab = newTabPage;
+                if (swap)
+                {
+                    TabControl.SelectedTab = newTabPage;
+                }
             }
             else
             {
                 existingTabPage.Controls.Clear();
                 existingTabPage.Controls.Add(design);
                 design.Dock = DockStyle.Fill;
+                if (swap)
+                {
+                    TabControl.SelectedTab = existingTabPage;
+                }
             }
 
             pnlMain.Focus();
