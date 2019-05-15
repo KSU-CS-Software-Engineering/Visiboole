@@ -136,9 +136,7 @@
     <Compile Include="Views\HelpWindow.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Views\HelpWindow.Designer.cs">
-      <DependentUpon>HelpWindow.cs</DependentUpon>
-    </Compile>
+    <Compile Include="Views\HelpWindow.Designer.cs" />
     <Compile Include="Views\IDisplay.cs" />
     <Compile Include="Views\IMainWindow.cs" />
     <Compile Include="Views\MainWindow.cs">
@@ -149,6 +147,12 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Views\SyntaxWindow.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Views\SyntaxWindow.Designer.cs">
+      <DependentUpon>SyntaxWindow.cs</DependentUpon>
+    </Compile>
     <Compile Include="Views\TutorialWindow.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -177,11 +181,12 @@
     <EmbeddedResource Include="Views\DisplayRun.resx">
       <DependentUpon>DisplayRun.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="Views\HelpWindow.resx">
-      <DependentUpon>HelpWindow.cs</DependentUpon>
-    </EmbeddedResource>
+    <EmbeddedResource Include="Views\HelpWindow.resx" />
     <EmbeddedResource Include="Views\MainWindow.resx">
       <DependentUpon>MainWindow.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\SyntaxWindow.resx">
+      <DependentUpon>SyntaxWindow.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Views\TutorialWindow.resx">
       <DependentUpon>TutorialWindow.cs</DependentUpon>
@@ -212,7 +217,10 @@
     <Content Include="Resources\Help Documentation\About.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="Resources\Help Documentation\Syntax.txt">
+    <Content Include="Resources\Help Documentation\Help.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Help Documentation\Syntax.html">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Resources\NewFile.png" />

@@ -31,7 +31,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Token type proposed by the lexer.
         /// </summary>
-        public enum TokenType
+        private enum TokenType
         {
             Variable,
             Constant,
@@ -59,7 +59,7 @@ namespace VisiBoole.ParsingEngine
             CloseConcatenation
         }
 
-        public class Token
+        private class Token
         {
             /// <summary>
             /// Gets the type of the token.
@@ -83,6 +83,78 @@ namespace VisiBoole.ParsingEngine
             }
         }
 
+        /// <summary>
+        /// Class for parentheses error detection
+        /// </summary>
+        private class ParenthesesLevel
+        {
+            /// <summary>
+            /// List of operators in this parenthesis level.
+            /// </summary>
+            public List<Token> Operators { get; private set; }
+
+            /// <summary>
+            /// Exclusive operator of this parenthesis level. (if any)
+            /// </summary>
+            public Token ExclusiveOperator { get; private set; }
+
+            /// <summary>
+            /// Constructs a parentheses level.
+            /// </summary>
+            public ParenthesesLevel()
+            {
+                // Start operators list
+                Operators = new List<Token>();
+                // Start exclusive operator with none
+                ExclusiveOperator = null;
+            }
+
+            /// <summary>
+            /// Attempts to add the new operator to the list of operators. Returns whether the operation was successful.
+            /// </summary>
+            /// <param name="newOperator">New operator to add</param>
+            /// <returns>Whether the operation was successfu0.l</returns>
+            public bool TryAddOperator(Token newOperator)
+            {
+                // If there is an exclusive operator
+                if (ExclusiveOperator != null)
+                {
+                    // Return whether the operators are the same
+                    return ExclusiveOperator.Type == newOperator.Type;
+                }
+                // If there isn't an exclusive operator
+                else
+                {
+                    // If the new operator is an exclusive operator and there were past non-exclusive opeators
+                    if (newOperator.Type == TokenType.EqualToOperator || newOperator.Type == TokenType.ExclusiveOrOperator)
+                    {
+                        // If there were previous operators
+                        if (Operators.Count > 0)
+                        {
+                            // Return failure
+                            return false;
+                        }
+                        // If there wasn't any previous operators
+                        else
+                        {
+                            // Set exclusive operator to the new operator
+                            ExclusiveOperator = newOperator;
+                        }
+                    }
+
+                    // If operators list doesn't contain the new operator
+                    if (!Operators.Contains(newOperator))
+                    {
+                        // Add operator to operator list
+                        Operators.Add(newOperator);
+                    }
+
+                    // Return success
+                    return true;
+                }
+            }
+        }
+
         #endregion
 
         #region Lexer Patterns and Regular Expressions
@@ -100,7 +172,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Pattern for identfying indexes.
         /// </summary>
-        private static readonly string IndexPattern = @"(\[(?<LeftBound>\d+)\.(?<Step>\d+)?\.(?<RightBound>\d+)\]|\[\])";
+        private static readonly string IndexPattern = @"(\[((?<LeftBound>\d+)(\.(?<Step>\d+)?\.(?<RightBound>\d+))?)?\])";
 
         /// <summary>
         /// Pattern for identifying vectors. (No ~ or *)
@@ -165,18 +237,21 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Pattern for identifying components (inputs or outputs) in a module notation.
         /// </summary>
-        private static readonly string ModuleComponentPattern = $@"(({AnyTypePattern}|{VariableListPattern})(,\s+({AnyTypePattern}|{VariableListPattern}))*)";
+        private static readonly string ModuleComponentPattern = $@"(({AnyTypePattern}|{VariableListPattern})(,\s*({AnyTypePattern}|{VariableListPattern}))*)";
 
         /// <summary>
         /// Pattern for identifying modules.
         /// </summary>
-        public static readonly string ModulePattern = $@"(?<Components>(?<Inputs>{ModuleComponentPattern})\s+:\s+(?<Outputs>{ModuleComponentPattern}))";
+        public static readonly string ModulePattern = $@"(?<Components>(?<Inputs>{ModuleComponentPattern})\s*:\s*(?<Outputs>{ModuleComponentPattern}))";
 
         /// <summary>
         /// Regex for identifying invalid characters.
         /// </summary>
         private static Regex InvalidRegex = new Regex(InvalidPattern, RegexOptions.Compiled);
 
+        /// <summary>
+        /// Regex for indentifying operators
+        /// </summary>
         private static Regex OperatorRegex = new Regex(OperatorPattern, RegexOptions.Compiled);
 
         /// <summary>
@@ -274,19 +349,21 @@ namespace VisiBoole.ParsingEngine
         private bool InsideModule;
 
         /// <summary>
-        /// Indicates whether the current execution contains a math expression.
+        /// Indicates whether math operators are valid.
         /// </summary>
-        private bool IsMathExpression;
-
-        /// <summary>
-        /// Exclusive operators list for the current execution.
-        /// </summary>
-        private List<Token> ExclusiveOperators;
+        private bool MathOperatorsValid;
 
         /// <summary>
         /// Operators lists for the current execution.
         /// </summary>
-        private List<List<Token>> Operators;
+        //private List<List<Token>> Operators;
+
+        /// <summary>
+        /// List of parentheses levels.
+        /// </summary>
+        private List<ParenthesesLevel> Parentheses;
+
+        private List<TokenType> Operations;
 
         /// <summary>
         /// List of libraries included for this instance.
@@ -493,7 +570,7 @@ namespace VisiBoole.ParsingEngine
         /// <param name="lexeme">Current lexeme</param>
         /// <param name="nextLexeme">Next lexeme</param>
         /// <returns>Token type of the provided lexeme</returns>
-        protected TokenType? GetTokenType(string currentLexeme, string nextLexeme)
+        private TokenType? GetTokenType(string currentLexeme, string nextLexeme)
         {
             // Get first character in current lexeme
             char firstCharInCurrentLexeme = currentLexeme[0];
@@ -697,7 +774,7 @@ namespace VisiBoole.ParsingEngine
         /// <param name="statementType">Statement type</param>
         /// <param name="line">Line</param>
         /// <returns>Whether the provided token is valid from the provided statement type</returns>
-        protected bool IsTokenValid(Token token, StatementType? statementType, string line)
+        private bool IsTokenValid(Token token, StatementType? statementType, string line)
         {
             // If token type is space, newline or semicolon
             if (token.Type == TokenType.Space || token.Type == TokenType.NewLine || token.Type == TokenType.Semicolon)
@@ -1074,10 +1151,8 @@ namespace VisiBoole.ParsingEngine
                         }
                     }
 
-                    // Add new operator list to opreators list
-                    Operators.Add(new List<Token>());
-                    // Add empty exclusive operator
-                    ExclusiveOperators.Add(null);
+                    // Add new parentheses level
+                    Parentheses.Add(new ParenthesesLevel());
                     // Return assignment statement type
                     return newToken.Type == TokenType.Assignment ? StatementType.Assignment : StatementType.ClockAssignment;
                 }
@@ -1252,103 +1327,84 @@ namespace VisiBoole.ParsingEngine
             // If new token is an operator
             else if (isNewTokenOperator)
             {
-                // If operator is not a negation operator
-                if (newToken.Type != TokenType.NegationOperator)
+                // If the new  operator is a math operator
+                if (newToken.Type == TokenType.MathOperator)
                 {
-                    // If left token isn't an operand
-                    if (!IsTokenLeftOperand(lastToken))
+                    // If math operators aren't valid
+                    if (!MathOperatorsValid)
                     {
-                        // Add missing left operand error to error log
-                        ErrorLog.Add(CurrentLineNumber, $"'{newToken.Text}' is missing a left operand.");
-                        // Return invalid syntax
-                        return false;
-                    }
-
-                    // If next token isn't an operand
-                    if (!IsNextCharRightOperand(nextLexeme))
-                    {
-                        // Add missing right operand error to error log
-                        ErrorLog.Add(CurrentLineNumber, $"'{newToken.Text}' is missing a right operand.");
+                        // Add mixing of boolean and math operators error to error log
+                        ErrorLog.Add(CurrentLineNumber, $"An assignment statement can not contain both Boolean and math operators in its expression.");
                         // Return invalid syntax
                         return false;
                     }
                 }
-
-                // Get current exclusive operator
-                Token currentExclusiveOperator = ExclusiveOperators[ExclusiveOperators.Count - 1];
-                // If current token is an exclusive operator and the current parentheses level doesn't have an exclusive operator
-                if (ExclusiveOperatorsList.Contains(newToken.Text) && currentExclusiveOperator == null)
+                // If the new operator is not a math operator
+                else
                 {
-                    // If any operator in the current level isn't the same exclusive operator
-                    if (Operators[Operators.Count - 1].Any(o => o.Type != newToken.Type))
+                    // If this operator is the first operator
+                    if (Operations.Count == 0)
                     {
-                        // If there are no parenthesis
-                        if (Operators.Count == 1)
-                        {
-                            // Add invalid operator error to error log
-                            ErrorLog.Add(CurrentLineNumber, $"'{newToken.Text}' operator must be the only operators.");
-                        }
-                        // If there are parenthesis
-                        else
-                        {
-                            // Add invalid operator error to error log
-                            ErrorLog.Add(CurrentLineNumber, $"'{newToken.Text}' operator must be the only operators within their enclosing parentheses.");
-                        }
+                        // Set math operators to invalid
+                        MathOperatorsValid = false;
+                    }
+
+                    // If this isn't the first operator and math operators are still valid
+                    if (Operations.Count != 0 && MathOperatorsValid)
+                    {
+                        // Add mixing of boolean and math operators error to error log
+                        ErrorLog.Add(CurrentLineNumber, $"An assignment statement can not contain both Boolean and math operators in its expression.");
                         // Return invalid syntax
                         return false;
                     }
 
-                    // Save exclusive operator
-                    ExclusiveOperators[ExclusiveOperators.Count - 1] = newToken;
-
-                    // If the expression is not a not a math expression and the new expression is a math operator
-                    if (!IsMathExpression && newToken.Type == TokenType.MathOperator)
+                    // If operator is not a negation operator
+                    if (newToken.Type != TokenType.NegationOperator)
                     {
-                        // For each previous operator list
-                        foreach (List<Token> tokenOperators in Operators)
+                        // If new token is an exclusive or equal to operator and it is not inside any parentheses
+                        if ((newToken.Type == TokenType.ExclusiveOrOperator || newToken.Type == TokenType.EqualToOperator) && Parentheses.Count == 1)
                         {
-                            // If there is an operator
-                            if (tokenOperators.Count > 0)
-                            {
-                                // Add mixing of boolean and math operators error to error log
-                                ErrorLog.Add(CurrentLineNumber, $"An expression can not contain both Boolean and math operators in an assignment statement.");
-                                // Return invalid syntax
-                                return false;
-                            }
+                            // Add invalid operator error to error log
+                            ErrorLog.Add(CurrentLineNumber, $"Missing () for '{newToken.Text}' operation.");
+                            // Return invalid syntax
+                            return false;
                         }
 
-                        // Set math expression to true
-                        IsMathExpression = true;
+                        // If left token isn't an operand
+                        if (!IsTokenLeftOperand(lastToken))
+                        {
+                            // Add missing left operand error to error log
+                            ErrorLog.Add(CurrentLineNumber, $"'{newToken.Text}' is missing a left operand.");
+                            // Return invalid syntax
+                            return false;
+                        }
+
+                        // If next token isn't an operand
+                        if (!IsNextCharRightOperand(nextLexeme))
+                        {
+                            // Add missing right operand error to error log
+                            ErrorLog.Add(CurrentLineNumber, $"'{newToken.Text}' is missing a right operand.");
+                            // Return invalid syntax
+                            return false;
+                        }
                     }
-                }
-                // If there is a current exclusive operator
-                else if (currentExclusiveOperator != null)
-                {
-                    // If the current exclusive operator isn't the same as the new exclusive operator
-                    if (currentExclusiveOperator.Type != newToken.Type)
+
+                    // If the parentheses level is unable to add the new operator (failures due to exclusive operators)
+                    if (!Parentheses[Parentheses.Count - 1].TryAddOperator(newToken))
                     {
-                        // If there are no parenthesis
-                        if (Operators.Count == 1)
-                        {
-                            // Add invalid operator error to error log
-                            ErrorLog.Add(CurrentLineNumber, $"'{newToken.Text}' operator must be the only operators.");
-                        }
-                        // If there are parenthesis
-                        else
-                        {
-                            // Add invalid operator error to error log
-                            ErrorLog.Add(CurrentLineNumber, $"'{newToken.Text}' operator must be the only operators within their enclosing parentheses.");
-                        }
+                        string exclusiveOperator = Parentheses[Parentheses.Count - 1].ExclusiveOperator != null ? Parentheses[Parentheses.Count - 1].ExclusiveOperator.Text : newToken.Text;
+                        // Add invalid operator error to error log
+                        ErrorLog.Add(CurrentLineNumber, $"'{exclusiveOperator}' operator must be the only operators within its enclosing parentheses.");
                         // Return invalid syntax
                         return false;
                     }
                 }
 
                 // If the current operators list doesn't have the current operator
-                if (!Operators[Operators.Count - 1].Any(o => o.Type == newToken.Type))
+                if (!Operations.Contains(newToken.Type))
                 {
                     // Add current operator to the operator list
-                    Operators[Operators.Count - 1].Add(newToken);
+                    Operations.Add(newToken.Type);
                 }
             }
             // If new token is an open parenthesis
@@ -1356,10 +1412,8 @@ namespace VisiBoole.ParsingEngine
             {
                 // Set inside module to true if last token was a declaration or instantiation
                 InsideModule = lastToken != null && (lastToken.Type == TokenType.Declaration || lastToken.Type == TokenType.Instantiation);
-                // Add new operators list
-                Operators.Add(new List<Token>());
-                // Add new empty exclusive operator
-                ExclusiveOperators.Add(null);
+                // Add new parentheses level
+                Parentheses.Add(new ParenthesesLevel());
             }
             // If new token is an open concatenation
             else if (newToken.Type == TokenType.OpenConcatenation)
@@ -1383,10 +1437,8 @@ namespace VisiBoole.ParsingEngine
 
                 // Set inside module to false
                 InsideModule = false;
-                // Remove current operators list
-                Operators.RemoveAt(Operators.Count - 1);
-                // Remove current exclusive operator
-                ExclusiveOperators.RemoveAt(ExclusiveOperators.Count - 1);
+                // Remove current parentheses
+                Parentheses.RemoveAt(Parentheses.Count - 1);
             }
             // If new token is a close concatenation
             else if (newToken.Type == TokenType.CloseConcatenation)
@@ -1680,8 +1732,9 @@ namespace VisiBoole.ParsingEngine
                     {
                         // Get last character
                         char lastChar = currentLexeme[currentLexeme.Length - 1];
-                        // If current character is < or current character is = and the last character wasn't = or <
-                        if (currentChar == '<' || (currentChar == '=' && lastChar != '=' && lastChar != '<'))
+
+                        // If current character is <
+                        if (currentChar == '<')
                         {
                             // Add current lexeme to lexeme list
                             lexemes.Add(currentLexemeValue);
@@ -1689,10 +1742,10 @@ namespace VisiBoole.ParsingEngine
                             currentLexeme.Clear();
                         }
                         // If current character is ~
-                        else if (currentChar == '~')
+                        else if (currentLexemeValue == "~")
                         {
-                            // If last character is not ~
-                            if (lastChar != '~')
+                            // If current character is not ~
+                            if (currentChar != '~')
                             {
                                 // Add current lexeme to lexeme list
                                 lexemes.Add(currentLexemeValue);
@@ -1708,10 +1761,10 @@ namespace VisiBoole.ParsingEngine
                             }
                         }
                         // If current character is *
-                        else if (currentChar == '*')
+                        else if (currentLexemeValue == "*")
                         {
-                            // If last character is not *
-                            if (lastChar != '*')
+                            // If current character is not *
+                            if (currentChar != '*')
                             {
                                 // Add current lexeme to lexeme list
                                 lexemes.Add(currentLexemeValue);
@@ -1726,11 +1779,30 @@ namespace VisiBoole.ParsingEngine
                                 continue;
                             }
                         }
-                        // If current character is any other character
+                        else if (currentLexemeValue == "==")
+                        {
+                            // Add current lexeme to lexeme list
+                            lexemes.Add(currentLexemeValue);
+                            // Clear current lexeme
+                            currentLexeme.Clear();
+                        }
                         else
                         {
-                            // If last character is a ~ or *
-                            if (lastChar == '~' || lastChar == '*')
+                            if (currentLexemeValue == "=" && currentChar != '=')
+                            {
+                                // Add current lexeme to lexeme list
+                                lexemes.Add(currentLexemeValue);
+                                // Clear current lexeme
+                                currentLexeme.Clear();
+                            }
+                            else if (currentLexemeValue == "<=" && currentChar != '@')
+                            {
+                                // Add current lexeme to lexeme list
+                                lexemes.Add(currentLexemeValue);
+                                // Clear current lexeme
+                                currentLexeme.Clear();
+                            }
+                            else if (currentChar == '=' && lastChar != '=' && lastChar != '<')
                             {
                                 // Add current lexeme to lexeme list
                                 lexemes.Add(currentLexemeValue);
@@ -1808,9 +1880,9 @@ namespace VisiBoole.ParsingEngine
             InsideConcat = false;
             InsideFormatter = false;
             InsideModule = false;
-            IsMathExpression = false;
-            ExclusiveOperators = new List<Token>();
-            Operators = new List<List<Token>>();
+            MathOperatorsValid = true;
+            Parentheses = new List<ParenthesesLevel>();
+            Operations = new List<TokenType>();
 
             // Get lexeme list for the current line
             var lexemes = GetLexemes(line);
@@ -1894,8 +1966,13 @@ namespace VisiBoole.ParsingEngine
                 ? string.Concat(vector.Value[0], vector.Groups["Name"].Value)
                 : vector.Groups["Name"].Value;
             int leftBound = Convert.ToInt32(vector.Groups["LeftBound"].Value);
-            int rightBound = Convert.ToInt32(vector.Groups["RightBound"].Value);
+            int rightBound = string.IsNullOrEmpty(vector.Groups["RightBound"].Value) ? -1 : Convert.ToInt32(vector.Groups["RightBound"].Value);
 
+            if (rightBound == -1)
+            {
+                return new List<string>(new string[] { string.Concat(name, leftBound) });
+            }
+            
             // If left bound is least significant bit
             if (leftBound < rightBound)
             {

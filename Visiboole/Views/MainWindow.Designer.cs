@@ -387,6 +387,7 @@ namespace VisiBoole.Views
             this.userGuideToolStripMenuItem.Name = "userGuideToolStripMenuItem";
             this.userGuideToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             this.userGuideToolStripMenuItem.Text = "User Guide";
+            this.userGuideToolStripMenuItem.Click += new System.EventHandler(this.userGuideToolStripMenuItem_Click);
             // 
             // aboutToolStripMenuItem
             // 

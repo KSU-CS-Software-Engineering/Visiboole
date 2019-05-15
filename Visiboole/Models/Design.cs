@@ -489,7 +489,7 @@ namespace VisiBoole.Models
                         SelectedText = "";
 
                         SelectionStart = start + Lines[i].LastIndexOf("\"");
-                        SelectionLength = 2;
+                        SelectionLength = 1;
                         SelectedText = "";
                     }
                     else
@@ -503,7 +503,7 @@ namespace VisiBoole.Models
                         int end = start + Lines[i].Length;
                         SelectionLength = 0;
                         SelectionStart = end;
-                        SelectedText = "\";";
+                        SelectedText = "\"";
                     }
                 }
             }

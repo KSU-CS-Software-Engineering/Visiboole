@@ -20,6 +20,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Text.RegularExpressions;
 using VisiBoole.Models;
 using VisiBoole.ParsingEngine.ObjectCode;
@@ -44,7 +45,6 @@ namespace VisiBoole.ParsingEngine.Statements
         /// </summary>
         public override List<IObjectCodeElement> Parse()
         {
-            // Output comment and newline
             return new List<IObjectCodeElement>(new IObjectCodeElement[] { new Comment(Text), new LineFeed() });
         }
 	}

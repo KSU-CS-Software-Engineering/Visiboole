@@ -51,7 +51,7 @@ namespace VisiBoole.Controllers
         /// <summary>
         /// Saves the handle to the controller for the MainWindow
         /// </summary>
-        void AttachMainWindowController(IMainWindowController mwController);
+        void AttachMainWindowController(IMainWindowController mainWindowController);
 
         /// <summary>
         /// Loads into the MainWindow the display of the given type
@@ -62,27 +62,27 @@ namespace VisiBoole.Controllers
         void RetrieveFocus();
 
         /// <summary>
-		/// Selects the tab page with the provided name.
+		/// Selects the specified design tab in the design tab control.
 		/// </summary>
 		/// <param name="name">Name of tabpage to select</param>
-		void SelectTabPage(string name);
+		void SelectDesignTab(string name);
 
         /// <summary>
-		/// Creates a new tab on the design tab control.
+		/// Creates a new design tab on the design tab control.
 		/// </summary>
 		/// <param name="design">Design that is to be displayed in a tab</param>
 		void CreateDesignTab(Design design);
 
         /// <summary>
-        /// Closes a specific tab in the design tab control.
+        /// Closes the specified design tab in the design tab control.
         /// </summary>
-        /// <param name="designName">Name of the design being closed</param>
+        /// <param name="name">Name of design tab to close</param>
         void CloseDesignTab(string name);
 
         /// <summary>
-        /// Closes all parsers
+        /// Closes all parser tabs.
         /// </summary>
-        void CloseParsers();
+        void CloseParserTabs();
 
         /// <summary>
         /// Sets the theme of edit and run tab control

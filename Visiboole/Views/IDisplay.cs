@@ -32,6 +32,19 @@ namespace VisiBoole.Views
     public delegate void DisplayTabChangeEventHandler(string name);
 
     /// <summary>
+    /// Delegate for display tab closing events.
+    /// </summary>
+    /// <param name="name">Name of display tab that is closing</param>
+    public delegate void DisplayTabClosingEventHandler(string name);
+
+    /// <summary>
+    /// Delegate for display tab closed events.
+    /// </summary>
+    /// <param name="name">Name of display tab that was closed</param>
+    /// <param name="count">Number of display tabs currently opened</param>
+    public delegate void DisplayTabClosedEventHandler(string name, int count);
+
+    /// <summary>
     /// Exposes methods for the four displays hosted by the MainWindow
     /// </summary>
     public interface IDisplay
@@ -42,9 +55,14 @@ namespace VisiBoole.Views
         event DisplayTabChangeEventHandler DisplayTabChanged;
 
         /// <summary>
+        /// Event that occurs when the display tab is closing.
+        /// </summary>
+        event DisplayTabClosingEventHandler DisplayTabClosing;
+
+        /// <summary>
         /// Event that occurs when the display tab is closed.
         /// </summary>
-        event DisplayTabChangeEventHandler DisplayTabClosed;
+        event DisplayTabClosedEventHandler DisplayTabClosed;
 
         /// <summary>
         /// Returns the type of this display

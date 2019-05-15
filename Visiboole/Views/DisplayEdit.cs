@@ -33,6 +33,21 @@ namespace VisiBoole.Views
     public partial class DisplayEdit : UserControl, IDisplay
     {
         /// <summary>
+        /// Event that occurs when the display tab is changed.
+        /// </summary>
+        public event DisplayTabChangeEventHandler DisplayTabChanged;
+
+        /// <summary>
+        /// Event that occurs when the display tab is closing.
+        /// </summary>
+        public event DisplayTabClosingEventHandler DisplayTabClosing;
+
+        /// <summary>
+        /// Event that occurs when the display tab is closed.
+        /// </summary>
+        public event DisplayTabClosedEventHandler DisplayTabClosed;
+
+        /// <summary>
         /// Controller for this display.
         /// </summary>
         private IDisplayController Controller;
@@ -71,6 +86,13 @@ namespace VisiBoole.Views
 		public void AttachTabControl(NewTabControl tabControl)
         {
             TabControl = tabControl;
+            tabControl.SelectedIndexChanged += (sender, eventArgs) => {
+                string tabName = tabControl.SelectedIndex != -1 ? tabControl.TabPages[TabControl.SelectedIndex].Text.TrimStart('*') : null;
+                DisplayTabChanged?.Invoke(tabName);
+            };
+            tabControl.TabXClicked += (sender, eventArgs) => {
+                DisplayTabClosing?.Invoke(((TabPage)sender).Text.TrimStart('*'));
+            };
             pnlMain.Controls.Add(TabControl, 0, 0);
             TabControl.Dock = DockStyle.Fill;
         }
@@ -116,7 +138,21 @@ namespace VisiBoole.Views
                 TabPage tabPage = TabControl.TabPages[i];
                 if (tabPage.Text.TrimStart('*') == name)
                 {
-                    TabControl.TabPages.RemoveAt(i);
+                    var closingTabPage = TabControl.TabPages[i];
+                    TabControl.SelectedIndex = -1;
+                    TabControl.TabPages.Remove(closingTabPage);
+                    if (TabControl.TabCount > 0)
+                    {
+                        if (TabControl.TabCount > i)
+                        {
+                            TabControl.SelectedIndex = i;
+                        }
+                        else
+                        {
+                            TabControl.SelectedIndex = i - 1;
+                        }
+                    }
+                    DisplayTabClosed?.Invoke(closingTabPage.Text, TabControl.TabCount);
                     break;
                 }
             }
@@ -127,7 +163,12 @@ namespace VisiBoole.Views
         /// </summary>
         public void CloseTabs()
         {
-            TabControl.TabPages.Clear();
+            for (int i = 0; i < TabControl.TabCount; i++)
+            {
+                var closingTabPage = TabControl.TabPages[0];
+                TabControl.TabPages.RemoveAt(0);
+                DisplayTabClosed?.Invoke(closingTabPage.Text, TabControl.TabCount);
+            }
         }
 
         /// <summary>
@@ -160,8 +201,7 @@ namespace VisiBoole.Views
                 newTabPage.Controls.Add(design);
 
                 design.Dock = DockStyle.Fill;
-                design.DesignEdit += (designName, isDirty) =>
-                {
+                design.DesignEdit += (designName, isDirty) => {
                     TabPage tabPage = FindTab(designName);
                     tabPage.Text = isDirty ? $"*{designName}" : designName;
                     Controller.LoadDisplay(DisplayType.EDIT);

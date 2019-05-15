@@ -126,6 +126,7 @@ namespace VisiBoole.Models
             Stack<string> operatorStack = new Stack<string>();
             Stack<int> parenthesisIndicesStack = new Stack<int>();
             Parentheses = new Dictionary<int, Parenthesis>();
+            bool wasPreviousOperand = false;
 
             // Obtain scalars, constants and operators
             string expression = $"({Expression})"; // Add () to expression
@@ -158,10 +159,17 @@ namespace VisiBoole.Models
                         Parentheses.Add(match.Index + ExpressionIndex - 1, new Parenthesis(")", parenthesesValue, areParenthesesNegated));
                         Parentheses.Add(parenthesisIndicesStack.Pop(), new Parenthesis("(", parenthesesValue, areParenthesesNegated));
                     }
+
+                    wasPreviousOperand = true;
                 }
                 else if (match.Value == "(" || match.Value == "~" || Lexer.OperatorsList.Contains(match.Value))
                 {
                     string operation = match.Value;
+
+                    if (operation == "(" && wasPreviousOperand)
+                    {
+                        operatorStack.Push(" ");
+                    }
 
                     // Check for operators that need evaluation
                     while (operatorStack.Count > 0 && (operation == "|" && operatorStack.Peek() == " "))
@@ -175,9 +183,16 @@ namespace VisiBoole.Models
                         parenthesisIndicesStack.Push(match.Index + ExpressionIndex - 1);
                     }
                     operatorStack.Push(operation);
+
+                    wasPreviousOperand = false;
                 }
                 else
                 {
+                    if (wasPreviousOperand)
+                    {
+                        operatorStack.Push(" ");
+                    }
+
                     // Process variable
                     string variable = match.Value;
                     bool containsNot = false;
@@ -193,6 +208,8 @@ namespace VisiBoole.Models
                         value = Convert.ToInt32(!Convert.ToBoolean(value));
                     }
                     valueStack.Push(value);
+
+                    wasPreviousOperand = true;
                 }
             }
 
@@ -224,7 +241,7 @@ namespace VisiBoole.Models
                     result = Convert.ToInt32(Convert.ToBoolean(leftValue) ^ Convert.ToBoolean(rightValue));
                     break;
                 case "==":
-                    result = Convert.ToInt32(Convert.ToBoolean(leftValue) == Convert.ToBoolean(rightValue));
+                    result = Convert.ToInt32(Convert.ToBoolean(leftValue == rightValue));
                     break;
                 case "+":
                     result = leftValue + rightValue;

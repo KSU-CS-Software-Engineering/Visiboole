@@ -91,8 +91,7 @@ namespace VisiBoole.ParsingEngine.Statements
         public override List<IObjectCodeElement> Parse()
         {
             // Create output list to return
-            List<IObjectCodeElement> output = new List<IObjectCodeElement>();
-            bool needsSpace = false;
+            var output = new List<IObjectCodeElement>();
             MatchCollection matches = OutputRegex.Matches(Text);
             foreach (Match match in matches)
             {
@@ -101,80 +100,64 @@ namespace VisiBoole.ParsingEngine.Statements
                 if (token == " ")
                 {
                     output.Add(new SpaceFeed());
-                    needsSpace = false;
                 }
                 else if (token == "\n")
                 {
                     output.Add(new LineFeed());
-                    needsSpace = false;
                 }
-                else
+                else if (token == "(" || token == ")")
                 {
-                    if (needsSpace && token != "@" && token != ")" && token != "}")
+                    output.Add(Expression.Parentheses[match.Index]); // Output the corresponding parenthesis
+                }
+                else if (token[0] == '<')
+                {
+                    // Output <= with dependent value
+                    if (!Expression.IsMathExpression)
                     {
-                        output.Add(new SpaceFeed());
-                        needsSpace = false;
-                    }
-
-                    if (token == "(" || token == ")")
-                    {
-                        output.Add(Expression.Parentheses[match.Index]); // Output the corresponding parenthesis
-                        needsSpace = false;
-                    }
-                    else if (token[0] == '<')
-                    {
-                        // Output <= with dependent value
-                        if (!Expression.IsMathExpression)
-                        {
-                            output.Add(new DependentVariable("<=", NextValue.Contains('1')));
-                        }
-                        else
-                        {
-                            output.Add(new Operator(token));
-                        }
-                        needsSpace = true;
-                    }
-                    else if (Parser.OperatorsList.Contains(token) || token == "{" || token == "}" || token == "@")
-                    {
-                        output.Add(new Operator(token));
-                        needsSpace = token != "@" && token != "{";
+                        output.Add(new DependentVariable("<=", NextValue.Contains('1')));
                     }
                     else
                     {
-                        if (!char.IsDigit(token[0]))
+                        output.Add(new Operator(token));
+                    }
+                }
+                else if (Parser.OperatorsList.Contains(token) || token == "{" || token == "}" || token == "@")
+                {
+                    output.Add(new Operator(token));
+                }
+                else
+                {
+                    if (!char.IsDigit(token[0]))
+                    {
+                        string name = token.TrimStart('~');
+                        IndependentVariable indVar = DesignController.ActiveDesign.Database.TryGetVariable<IndependentVariable>(name) as IndependentVariable;
+                        DependentVariable depVar = DesignController.ActiveDesign.Database.TryGetVariable<DependentVariable>(name) as DependentVariable;
+                        if (indVar != null)
                         {
-                            string name = token.TrimStart('~');
-                            IndependentVariable indVar = DesignController.ActiveDesign.Database.TryGetVariable<IndependentVariable>(name) as IndependentVariable;
-                            DependentVariable depVar = DesignController.ActiveDesign.Database.TryGetVariable<DependentVariable>(name) as DependentVariable;
-                            if (indVar != null)
+                            if (token[0] != '~')
                             {
-                                if (token[0] != '~')
-                                {
-                                    output.Add(indVar);
-                                }
-                                else
-                                {
-                                    output.Add(new IndependentVariable(name, !indVar.Value));
-                                }
+                                output.Add(indVar);
                             }
-                            else if (depVar != null)
+                            else
                             {
-                                if (token[0] != '~')
-                                {
-                                    output.Add(depVar);
-                                }
-                                else
-                                {
-                                    output.Add(new DependentVariable(name, !depVar.Value));
-                                }
+                                output.Add(new IndependentVariable(token, !indVar.Value));
                             }
                         }
-                        else
+                        else if (depVar != null)
                         {
-                            output.Add(new Constant(token));
+                            if (token[0] != '~')
+                            {
+                                output.Add(depVar);
+                            }
+                            else
+                            {
+                                output.Add(new DependentVariable(token, !depVar.Value));
+                            }
                         }
-
-                        needsSpace = true;
+                    }
+                    else
+                    {
+                        output.Add(new Constant(token));
                     }
                 }
             }

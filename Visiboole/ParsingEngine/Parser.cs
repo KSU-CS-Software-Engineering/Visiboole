@@ -38,15 +38,31 @@ namespace VisiBoole.ParsingEngine
     /// </summary>
 	public class Parser : Lexer
 	{
+        /// <summary>
+        /// Class that contains the statement text and type.
+        /// </summary>
         private class SourceCode
         {
+            /// <summary>
+            /// Text of the statement.
+            /// </summary>
             public string Text { get; private set; }
 
+            /// <summary>
+            /// Type of the statement.
+            /// </summary>
             public StatementType Type { get; private set; }
 
+            /// <summary>
+            /// Constructs a source code element with the specified text and type.
+            /// </summary>
+            /// <param name="text">Text of statement</param>
+            /// <param name="type">Type of statement</param>
             public SourceCode(string text, StatementType type)
             {
+                // Save text of statement
                 Text = text;
+                // Save type of statement
                 Type = type;
             }
         }
@@ -91,7 +107,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Regex for identifying comma seperating.
         /// </summary>
-        public static Regex CommaSeperatingRegex { get; } = new Regex(@",\s+", RegexOptions.Compiled);
+        public static Regex CommaSeperatingRegex { get; } = new Regex(@",\s*", RegexOptions.Compiled);
 
         /// <summary>
         /// Regex for identifying vectors that need to be expanded.
@@ -131,7 +147,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Regex for identifying comment statements.
         /// </summary>
-        public static Regex CommentStmtRegex = new Regex(@"^(?<FrontSpacing>\s*)(?<DoInclude>[+-])?""(?<Comment>.*)""\s*;$", RegexOptions.Compiled);
+        public static Regex CommentStmtRegex = new Regex(@"^(?<FrontSpacing>\s+)?""(?<Comment>[\s\S]+)""\s*$", RegexOptions.Compiled);
 
         /// <summary>
         /// Regex for identifying library statements.
@@ -223,7 +239,7 @@ namespace VisiBoole.ParsingEngine
 
             // Get input values
             List<bool> inputValues = new List<bool>();
-            foreach (string input in Regex.Split(inputLists, @",\s+"))
+            foreach (string input in CommaSeperatingRegex.Split(inputLists))
             {
                 string[] vars = GetExpansion(AnyTypeRegex.Match(input)).ToArray();
                 foreach (string var in vars)
@@ -234,7 +250,7 @@ namespace VisiBoole.ParsingEngine
 
             // Get input variables
             List<string> inputNames = new List<string>();
-            foreach (string input in Regex.Split(Regex.Match(moduleDeclaration, ModulePattern).Groups["Inputs"].Value, @",\s+"))
+            foreach (string input in CommaSeperatingRegex.Split(Regex.Match(moduleDeclaration, ModulePattern).Groups["Inputs"].Value))
             {
                 inputNames.AddRange(GetExpansion(AnyTypeRegex.Match(input)));
             }
@@ -322,17 +338,30 @@ namespace VisiBoole.ParsingEngine
         /// <returns>Whether there was an error</returns>
         private bool TryRunSubmodules()
         {
-            foreach (Statement statement in Statements)
+            var instantiations = Statements.Where(statement => statement.GetType() == typeof(InstantiationStmt)).ToArray();
+            for (int i = 0; i < instantiations.Length; i++)
             {
-                if (statement.GetType() == typeof(InstantiationStmt))
+                InstantiationStmt submodule = (InstantiationStmt)instantiations[i];
+                if (!submodule.TryRunInstance())
                 {
-                    InstantiationStmt submodule = (InstantiationStmt)statement;
-                    if (!submodule.TryRunInstance())
-                    {
-                        return false;
-                    }
+                    return false;
                 }
             }
+
+            bool reset;
+            do
+            {
+                reset = false;
+                for (int i = 0; i < instantiations.Length; i++)
+                {
+                    InstantiationStmt submodule = (InstantiationStmt)instantiations[i];
+                    if (submodule.CheckRerun())
+                    {
+                        reset = true;
+                    }
+                }
+            } while (reset == true);
+
             return true;
         }
 
@@ -471,7 +500,7 @@ namespace VisiBoole.ParsingEngine
 
             // Set input values
             int inputValuesIndex = 0;
-            foreach (string inputList in Regex.Split(moduleMatch.Groups["Inputs"].Value, @",\s+"))
+            foreach (string inputList in CommaSeperatingRegex.Split(moduleMatch.Groups["Inputs"].Value))
             {
                 foreach (string input in WhitespaceRegex.Split(inputList))
                 {
@@ -501,7 +530,7 @@ namespace VisiBoole.ParsingEngine
 
             // Get output values
             List<bool> outputValues = new List<bool>();
-            foreach (string outputList in Regex.Split(moduleMatch.Groups["Outputs"].Value, @",\s+"))
+            foreach (string outputList in CommaSeperatingRegex.Split(moduleMatch.Groups["Outputs"].Value))
             {
                 // Output each output var in the output list
                 foreach (string output in WhitespaceRegex.Split(outputList))
@@ -527,84 +556,104 @@ namespace VisiBoole.ParsingEngine
         private List<string> ReadLines(StreamReader streamReader)
         {
             // Create list of lines to return
-            List<string> lines = new List<string>();
+            var lines = new List<string>();
             // Create current statement
-            string currentStatement = "";
-            // Start current line number at 1
-            CurrentLineNumber = 1;
+            var currentStatement = new StringBuilder();
+            // Start current line number at 0
+            CurrentLineNumber = 0;
 
+            // Current line
             string line;
             // While the reader reads a line
             while ((line = streamReader.ReadLine()) != null)
             {
-                // If line is empty
-                if (line.Length == 0)
+                line = line.TrimEnd();
+                LineNumberCount++;
+                CurrentLineNumber++;
+
+                if (currentStatement.Length == 0)
                 {
-                    // Add line to lines list
-                    lines.Add(line);
-                    // Increment current line number
-                    CurrentLineNumber++;
-                }
-                // If line doesn't contain a semicolon
-                else if (!line.Contains(';'))
-                {
-                    // If the current statement is an on going statement
-                    if (currentStatement.Length > 0)
+                    int firstCharIndex = -1;
+                    char firstChar = '\0';
+                    // For each character in the line
+                    for (int i = 0; i < line.Length; i++)
                     {
-                        // Add a newline seperator
-                        currentStatement += '\n';
+                        // Get current character
+                        char currentChar = line[i];
+                        // If current character is not empty
+                        if (currentChar != ' ')
+                        {
+                            // Set first non-empty character index to the index of the current character
+                            firstCharIndex = i;
+                            // Set first non-empty character to the current character
+                            firstChar = currentChar;
+                            // Break out of loop (We found our first non-empty character)
+                            break;
+                        }
                     }
-                    // Add line to current statement
-                    currentStatement += line;
-                }
-                // If line does contain a semicolon
-                else
-                {
-                    // Get semicolon index
-                    int semicolonIndex = line.IndexOf(';');
-                    // If semicolon is first non-whitespace character
-                    if (string.Concat(currentStatement, line.Substring(0, line.IndexOf(';'))).All(c => c == ' ' || c == '\n'))
+
+                    if (firstChar == '"')
                     {
-                        // Add empty statement termination error to error log
-                        ErrorLog.Add(CurrentLineNumber, "';' can not be used to end comment or null statements.");
+                        // Set ending character index to the last index of "
+                        int endingQuoteIndex = line.LastIndexOf('"');
+                        // If the line only contains one " or the line has non-empty characters after the "
+                        if (firstCharIndex == endingQuoteIndex || line.Substring(endingQuoteIndex + 1).Any(c => c != ' '))
+                        {
+                            // Add invalid comment statement error to error log
+                            ErrorLog.Add(CurrentLineNumber, "Invalid comment statement. Comment statements must begin and end with '\"'.");
+                            // Return null for error
+                            return null;
+                        }
+
+                        // Trim end of line and add to list of lines
+                        lines.Add(line);
+                        // Continue to next line
+                        continue;
+                    }
+                    else if (firstChar == '\0')
+                    {
+                        lines.Add(line);
+                    }
+                }
+
+                // Get index of ;
+                int endingSemicolonIndex = line.IndexOf(';');
+                if (endingSemicolonIndex != -1)
+                {
+                    // If the line has non-empty characters after the semicolon
+                    if (line.Substring(endingSemicolonIndex + 1).Any(c => c != ' '))
+                    {
+                        // Add multiple statements on line error to error log
+                        ErrorLog.Add(CurrentLineNumber, "Only one statement can appear on a line.");
+                        // Return null for error
                         return null;
                     }
 
-                    if (semicolonIndex + 1 < line.Length)
+                    // If the current statement isn't empty
+                    if (currentStatement.Length > 0)
                     {
-                        // For all characteres after the semicolon index
-                        for (int i = semicolonIndex + 1; i < line.Length; i++)
-                        {
-                            // If the character is not an empty space
-                            if (line[i] != ' ')
-                            {
-                                // Add multiple statements on line error to error log
-                                ErrorLog.Add(CurrentLineNumber, "Only one statement can appear on a line.");
-                                return null;
-                            }
-                        }
-
-                        line = line.TrimEnd();
+                        // Add new line seperator to the current statement
+                        currentStatement.Append('\n');
+                        // Add current line to the current statement
+                        currentStatement.Append(line);
+                        lines.Add(currentStatement.ToString());
+                        currentStatement.Clear();
                     }
-
-                    // If current statement is empty
-                    if (currentStatement.Length == 0)
-                    {
-                        // Add line to lines list
-                        lines.Add(line);
-                    }
-                    // If current statement is not empty
                     else
                     {
-                        // Add the current statement with the current line to the list of lines
-                        lines.Add(string.Concat(currentStatement, "\n", line));
-                        // Reset current statement
-                        currentStatement = "";
-                        // Increment statement line number by the number of new lines characters in the previous on going statement
-                        CurrentLineNumber += lines.Last().Count(c => c == '\n');
+                        lines.Add(line);
                     }
-                    // Increment statement line number
-                    CurrentLineNumber++;
+                }
+                else
+                {
+                    // If the current statement isn't empty
+                    if (currentStatement.Length > 0)
+                    {
+                        // Add new line seperator to the current statement
+                        currentStatement.Append('\n');
+                    }
+                    // Add current line to the current statement
+                    currentStatement.Append(line);
                 }
             }
 
@@ -616,7 +665,6 @@ namespace VisiBoole.ParsingEngine
                 return null;
             }
 
-            LineNumberCount = CurrentLineNumber;
             return lines;
         }
 
@@ -739,13 +787,13 @@ namespace VisiBoole.ParsingEngine
                 if (canExpand)
                 {
                     // Get expanded text of source
-                    expandedText = ExpandSource(source.Text.Replace("**", "").Replace("~~", ""));
+                    expandedText = ExpandSource(source.Text);
                 }
                 // If source can't expand
                 else
                 {
                     // Set expanded text equal to the source text
-                    expandedText = source.Text.Replace("**", "").Replace("~~", "");
+                    expandedText = source.Text;
                 }
                 // If expanded text is null
                 if (expandedText == null)
@@ -761,7 +809,7 @@ namespace VisiBoole.ParsingEngine
                 }
 
                 // If current execution is valid and not empty
-                if (valid && expandedText.Length != 0)
+                if (valid && expandedText.Length != 0 && source.Type != StatementType.Comment && source.Type != StatementType.Library)
                 {
                     // Remove current source code
                     sourceCode.RemoveAt(i);
@@ -773,39 +821,31 @@ namespace VisiBoole.ParsingEngine
                     {
                         // Get line of the expanded source text
                         string line = expandedSourceText[j];
-                        // Get whether the line needs to be initialized
-                        bool needsInit = source.Type != StatementType.Comment && source.Type != StatementType.Empty && source.Type != StatementType.Library;
-                        // If line needs to be initialized and we are unable to init the line
-                        if (needsInit && !InitSource(line, source.Type))
+                        // If source is a header or instantiation
+                        if (source.Type == StatementType.Header || source.Type == StatementType.Instantiation)
                         {
-                            if (source.Type == StatementType.Header || source.Type == StatementType.Instantiation)
+                            if (!InitSource(line.Substring(line.IndexOf('(')), source.Type))
                             {
-                                if (!InitSource(line.Substring(line.IndexOf('(')), source.Type))
-                                {
-                                    // Set valid to false
-                                    valid = false;
-                                    // End expanded source iterations
-                                    break;
-                                }
-                            }
-                            else
-                            {
-                                if (!InitSource(line, source.Type))
-                                {
-                                    // Set valid to false
-                                    valid = false;
-                                    // End expanded source iterations
-                                    break;
-                                }
-
+                                // Set valid to false
+                                valid = false;
+                                // End expanded source iterations
+                                break;
                             }
                         }
-                        // If able to init line
+                        // If source is a variable display or assignment statement
                         else
                         {
-                            // Add line to expanded source code list
-                            sourceCode.Insert(i, new SourceCode($"{line};", source.Type));
+                            if (!InitSource(line, source.Type))
+                            {
+                                // Set valid to false
+                                valid = false;
+                                // End expanded source iterations
+                                break;
+                            }
                         }
+
+                        // Add line to expanded source code list
+                        sourceCode.Insert(i, new SourceCode($"{line};", source.Type));
                     }
                     // Increment i by one less the number of added lines
                     i += expandedSourceText.Length - 1;
@@ -873,14 +913,10 @@ namespace VisiBoole.ParsingEngine
                 {
                     // Get comment match
                     Match commentMatch = CommentStmtRegex.Match(source.Text);
-                    // If comment should be displayed
-                    if (commentMatch.Groups["DoInclude"].Value != "-" && (Properties.Settings.Default.SimulationComments || commentMatch.Groups["DoInclude"].Value == "+"))
-                    {
-                        // Get comment to display
-                        string comment = $"{commentMatch.Groups["FrontSpacing"].Value}{commentMatch.Groups["Comment"].Value}";
-                        // Add comment statement to statement list
-                        statements.Add(new CommentStmt(comment));
-                    }
+                    // Get comment to display
+                    string comment = $"{commentMatch.Groups["FrontSpacing"].Value}{commentMatch.Groups["Comment"].Value}";
+                    // Add comment statement to statement list
+                    statements.Add(new CommentStmt(comment));
                 }
                 // If the source statement type is a boolean statement
                 else if (source.Type == StatementType.Assignment)
@@ -1122,7 +1158,7 @@ namespace VisiBoole.ParsingEngine
                     // If variable is dependent
                     else
                     {
-                        if (Design.Database.HasDependencyList(dependent))
+                        if (Design.Database.HasDependencyList(variable) || Design.Database.GetValue($"{variable}.d") != -1)
                         {
                             // Already dependent error
                             ErrorLog.Add(GetLineNumber(source, variableMatch.Index), $"{variable} was previously assigned a value.");
@@ -1419,6 +1455,7 @@ namespace VisiBoole.ParsingEngine
             // If line contains a = (Math expression)
             if (line.Contains('='))
             {
+                int assignmentIndex = expandedLine.IndexOf('=');
                 Regex variableListRegex = new Regex($@"(?<!@){VariableListPattern}(?![^{{}}]*\}})"); // Variable lists not inside {}
                 while ((match = variableListRegex.Match(expandedLine)).Success)
                 {
@@ -1430,8 +1467,8 @@ namespace VisiBoole.ParsingEngine
                     // If element count is less than the max element count
                     if (elementCount < maxExpansionCount)
                     {
-                        // If variable list is the dependent
-                        if (match.Index > expandedLine.IndexOf('='))
+                        // If variable list isn't the dependent
+                        if (match.Index > assignmentIndex)
                         {
                             // Add padding 0
                             for (int i = 0; i < maxExpansionCount - elementCount; i++)

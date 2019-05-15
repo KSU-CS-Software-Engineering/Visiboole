@@ -93,19 +93,13 @@ namespace VisiBoole.Controllers
         }
 
         /// <summary>
-        /// Displays file-save success message to the user
+        /// Returns whether the specified design has a parser already opened.
         /// </summary>
-        /// <param name="fileSaved">True if the file was saved successfully</param>
-        private void SaveFileSuccess(bool fileSaved)
+        /// <param name="name">Name of the design.</param>
+        /// <returns>Whether the specified design has a parser already opened.</returns>
+        public bool DesignHasParser(string name)
         {
-            if (fileSaved == true)
-            {
-                DialogBox.New("Success", "File save successful.", DialogType.Ok);
-            }
-            else
-            {
-                DialogBox.New("Failure", "File save failed.", DialogType.Ok);
-            }
+            return DesignController.DesignHasParser(name);
         }
 
         /// <summary>
@@ -117,9 +111,12 @@ namespace VisiBoole.Controllers
         {
             if (updateDesignControl)
             {
-                DisplayController.SelectTabPage(name);
+                DisplayController.SelectDesignTab(name);
             }
-            DesignController.SelectDesign(name);
+            else
+            {
+                DesignController.SelectFile(name);
+            }
         }
 
         /// <summary>
@@ -134,9 +131,9 @@ namespace VisiBoole.Controllers
                 File.Delete(path);
             }
 
-            Design design = DesignController.CreateDesign(path);
-            DisplayController.CreateDesignTab(design);
-            MainWindow.AddNavTreeNode(design.FileName);
+            var newDesign = DesignController.CreateDesign(path);
+            DisplayController.CreateDesignTab(newDesign);
+            MainWindow.AddNavTreeNode(newDesign.FileName);
             LoadDisplay(DisplayType.EDIT);
         }
 
@@ -145,7 +142,7 @@ namespace VisiBoole.Controllers
         /// </summary>
         public void SaveFile(string name = null)
         {
-            SaveFileSuccess(DesignController.SaveDesign(name));
+            DesignController.SaveDesign(name);
         }
 
         /// <summary>
@@ -155,35 +152,37 @@ namespace VisiBoole.Controllers
         public void SaveFileAs(string path)
         {
             // Get current design that is being saved as
-            Design currentDesign = DesignController.GetActiveDesign();
+            var currentDesign = DesignController.GetActiveDesign();
             // Get current design's name
             string currentDesignName = currentDesign.FileName;
 
+            // If design names are the same
             if (currentDesignName == Path.GetFileNameWithoutExtension(path))
             {
+                // Save current design
                 SaveFile(currentDesignName);
             }
+            // If design names are different
             else
             {
                 // Write content of current design to new design
                 File.WriteAllText(Path.ChangeExtension(path, ".vbi"), currentDesign.Text);
                 // Create new design
-                Design newDesign = DesignController.CreateDesign(path);
+                var newDesign = DesignController.CreateDesign(path);
                 // Create design tab with new design
                 DisplayController.CreateDesignTab(newDesign);
                 // Add node with new design
                 MainWindow.AddNavTreeNode(newDesign.FileName);
-                // Display success
-                SaveFileSuccess(true);
             }
         }
 
         /// <summary>
-        /// Saves all files opened
+        /// Saves all files opened.
         /// </summary>
         public void SaveFiles()
         {
-            SaveFileSuccess(DesignController.SaveDesigns());
+            // Save designs
+            DesignController.SaveDesigns();
         }
 
         /// <summary>
@@ -194,41 +193,39 @@ namespace VisiBoole.Controllers
         /// <returns></returns>
         public string CloseFile(string name = null, bool updateDesignControl = true)
         {
-            // Save active design
+            // Get active design
             Design activeDesign = DesignController.GetActiveDesign();
             string designName = name ?? activeDesign.FileName;
             Design design = designName == null ? activeDesign : DesignController.GetDesign(designName);
 
-            if (design != null)
-            {
-                bool save = true;
+            bool save = true;
 
-                if (design.IsDirty)
-                {
-                    DialogResult result = DialogBox.New("Confirm", $"{designName} has unsaved changes. Would you like to save these changes?", DialogType.YesNoCancel);
-                    if (result == DialogResult.No)
-                    {
-                        save = false;
-                    }
-                    else if (result == DialogResult.Cancel)
-                    {
-                        return null;
-                    }
-                }
-
-                // Otherwise close file
-                if (updateDesignControl)
-                {
-                    DisplayController.CloseDesignTab(designName);
-                }
-                DesignController.CloseDesign(designName, save);
-                MainWindow.RemoveNavTreeNode(designName);
-                return designName;
-            }
-            else
+            if (design.IsDirty)
             {
-                return null;
+                DialogResult result = DialogBox.New("Confirm", $"{designName} has unsaved changes. Would you like to save these changes?", DialogType.YesNoCancel);
+                if (result == DialogResult.No)
+                {
+                    save = false;
+                }
+                else if (result == DialogResult.Cancel)
+                {
+                    return null;
+                }
             }
+
+            // Remove nav tree node of the design
+            MainWindow.RemoveNavTreeNode(designName);
+            // If design tab control needs to be updated
+            if (updateDesignControl)
+            {
+                // Close design tab and design
+                DisplayController.CloseDesignTab(designName);
+            }
+            // Close design
+            DesignController.CloseDesign(designName, save);
+
+
+            return designName;
         }
 
         /// <summary>
@@ -293,15 +290,6 @@ namespace VisiBoole.Controllers
         public void SetFontSize()
         {
             DesignController.SetDesignFontSizes();
-        }
-
-        /// <summary>
-        /// Selects the parser with the provided design name.
-        /// </summary>
-        /// <param name="designName"></param>
-        public void SelectParser(string designName)
-        {
-            DesignController.SelectParser(designName);
         }
 
         /// <summary>
@@ -385,21 +373,20 @@ namespace VisiBoole.Controllers
         }
 
         /// <summary>
-        /// Removes all parsers.
+        /// Removes all parser tabs from the run display and closes all instantiation parsers in the parser dictionary.
         /// </summary>
-        public void ClearParsers()
+        public void SuspendRunDisplay()
         {
-            DesignController.ClearParsers();
-            DisplayController.CloseParsers();
+            DisplayController.CloseParserTabs();
         }
 
         /// <summary>
-        /// Closes the parser with the provided design name.
+        /// Removes the parser of the specified instantiation from the dictionary of opened parsers.
         /// </summary>
-        /// <param name="designName"></param>
-        public void CloseParser(string designName)
+        /// <param name="name">Name of parser to close.</param>
+        public void CloseInstantiationParser(string name)
         {
-            DesignController.CloseParser(designName);
+            DesignController.CloseInstantiationParser(name);
         }
     }
 }

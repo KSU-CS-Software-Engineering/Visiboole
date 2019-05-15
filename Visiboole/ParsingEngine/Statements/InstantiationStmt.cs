@@ -43,6 +43,16 @@ namespace VisiBoole.ParsingEngine.Statements
         private Design Subdesign;
 
         /// <summary>
+        /// List of input variables
+        /// </summary>
+        private List<string> InputVariables;
+
+        /// <summary>
+        /// List of input values.
+        /// </summary>
+        private List<bool> InputValues;
+
+        /// <summary>
         /// List of no concant values in the instaniation.
         /// </summary>
         private List<bool> NoContactValues;
@@ -55,6 +65,8 @@ namespace VisiBoole.ParsingEngine.Statements
 		public InstantiationStmt(string text, Design subdesign) : base(text)
 		{
             Subdesign = subdesign;
+            InputVariables = new List<string>();
+            InputValues = new List<bool>();
             NoContactValues = new List<bool>();
         }
 
@@ -66,26 +78,29 @@ namespace VisiBoole.ParsingEngine.Statements
         {
             // Save current design
             Design currentDesign = DesignController.ActiveDesign;
-            // Create input values list
-            List<bool> inputValues = new List<bool>();
             // Get input side text
             string inputSideText = Text.Substring(Text.IndexOf('('), Text.IndexOf(':') + 1 - Text.IndexOf('('));
             // Get output side text
             string outputSideText = Text.Substring(Text.IndexOf('(') + inputSideText.Length);
 
+            InputVariables = new List<string>();
+            InputValues = new List<bool>();
             MatchCollection matches = Parser.VariableRegex.Matches(inputSideText);
             foreach (Match match in matches)
             {
-                inputValues.Add(currentDesign.Database.GetValue(match.Value) == 1);
+                InputVariables.Add(match.Value);
+                InputValues.Add(currentDesign.Database.GetValue(match.Value) == 1);
             }
 
             Parser subParser = new Parser(Subdesign);
             DesignController.ActiveDesign = Subdesign;
-            List<bool> outputValues = subParser.ParseAsModule(inputValues);
+            List<bool> outputValues = subParser.ParseAsModule(InputValues);
             // Reset active design
             DesignController.ActiveDesign = currentDesign;
+            // If no output was returned
             if (outputValues == null)
             {
+                // Return false for error
                 return false;
             }
 
@@ -107,6 +122,42 @@ namespace VisiBoole.ParsingEngine.Statements
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Returns whether the instantiation was reran due to new input values.
+        /// </summary>
+        /// <returns>Whether the instantiation was reran due to new input values.</returns>
+        public bool CheckRerun()
+        {
+            // Start rerun with false
+            bool rerun = false;
+            // For each input variable in input variables
+            for (int i = 0; i < InputVariables.Count; i++)
+            {
+                // Get the input variable
+                string variable = InputVariables[i];
+                // If the input variable has a new value
+                if (DesignController.ActiveDesign.Database.GetValue(variable) == 1 != InputValues[i])
+                {
+                    // Set rerun to true
+                    rerun = true;
+                    // Break out of loop
+                    break;
+                }
+            }
+
+            // If instantiation needs to be reran
+            if (rerun)
+            {
+                // Rerun instance
+                TryRunInstance();
+                // Return true for the instantiation being ran again
+                return true;
+            }
+
+            // Return false for the instantiation was not ran again
+            return false;
         }
 
         /// <summary>

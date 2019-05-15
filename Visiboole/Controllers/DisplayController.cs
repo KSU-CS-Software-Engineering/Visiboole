@@ -29,6 +29,7 @@ using System.Drawing;
 using System.Threading;
 using System;
 using CustomTabControl;
+using System.Linq;
 
 namespace VisiBoole.Controllers
 {
@@ -109,8 +110,6 @@ namespace VisiBoole.Controllers
             browserTabControl.TabBoundaryColor = Color.Black;
             browserTabControl.SelectedTabTextColor = Color.White;
 
-            InstantiationClicks = new TreeNode();
-
             // Create html builder
             HtmlBuilder = new HtmlBuilder();
 
@@ -118,25 +117,61 @@ namespace VisiBoole.Controllers
             EditDisplay = editDisplay;
             EditDisplay.AttachTabControl(designTabControl);
             EditDisplay.DisplayTabChanged += (tabName) => {
+                // Select the tab associated with the tab
                 MainWindowController.SelectFile(tabName);
+                if (tabName != null)
+                {
+                    MainWindowController.LoadDisplay(DisplayType.EDIT);
+                }
             };
-            EditDisplay.DisplayTabClosed += (tabName) => {
-                MainWindowController.CloseFile(tabName, false);
+            EditDisplay.DisplayTabClosing += (tabName) => {
+                // Close file associated with the tab
+                MainWindowController.CloseFile(tabName, true);
             };
 
             // Init run display
             RunDisplay = runDisplay;
             RunDisplay.AttachTabControl(browserTabControl);
             RunDisplay.DisplayTabChanged += (tabName) => {
-                MainWindowController.SelectParser(tabName);
-            };
-            RunDisplay.DisplayTabClosed += (tabName) => {
-                MainWindowController.CloseParser(tabName);
-                foreach (TreeNode treeNode in InstantiationClicks.Nodes)
+                if (tabName != null)
                 {
-                    if (treeNode.Text == tabName)
+                    // Select the tab associated with the tab
+                    MainWindowController.SelectFile(tabName);
+                }
+            };
+            RunDisplay.DisplayTabClosed += (tabName, tabCount) => {
+                // If the tab is an instantiation parser
+                if (tabName.Contains("."))
+                {
+                    // Close parser associated with the tab
+                    MainWindowController.CloseInstantiationParser(tabName);
+                    var treeNodes = Collect(InstantiationClicks.Nodes).ToList();
+                    // For each 
+                    foreach (TreeNode treeNode in treeNodes)
                     {
-                        InstantiationClicks.Nodes.Remove(treeNode);
+                        if (treeNode.Text == tabName)
+                        {
+                            treeNode.Parent.Nodes.Remove(treeNode);
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    if (tabCount > 0)
+                    {
+                        MainWindowController.SuspendRunDisplay();
+                    }
+
+                    // Select the tab associated with the tab
+                    MainWindowController.SelectFile(tabName);
+                }
+
+                if (tabCount == 0)
+                {
+                    if (CurrentDisplay is DisplayRun)
+                    {
+                        MainWindowController.LoadDisplay(DisplayType.EDIT);
                     }
                 }
             };
@@ -185,16 +220,16 @@ namespace VisiBoole.Controllers
         }
 
         /// <summary>
-		/// Selects the tab page with the provided name.
+		/// Selects the specified design tab in the design tab control.
 		/// </summary>
 		/// <param name="name">Name of tabpage to select</param>
-		public void SelectTabPage(string name)
+		public void SelectDesignTab(string name)
         {
             CurrentDisplay.SelectTab(name);
         }
 
         /// <summary>
-		/// Creates a new tab on the design tab control.
+		/// Creates a new design tab on the design tab control.
 		/// </summary>
 		/// <param name="design">Design that is to be displayed in a tab</param>
 		public void CreateDesignTab(Design design)
@@ -203,18 +238,18 @@ namespace VisiBoole.Controllers
         }
 
         /// <summary>
-        /// Closes a specific tab in the design tab control.
+        /// Closes the specified design tab in the design tab control.
         /// </summary>
-        /// <param name="designName">Name of the design being closed</param>
+        /// <param name="name">Name of design tab to close</param>
         public void CloseDesignTab(string name)
         {
             CurrentDisplay.CloseTab(name);
         }
 
         /// <summary>
-        /// Closes all parsers
+        /// Closes all parser tabs.
         /// </summary>
-        public void CloseParsers()
+        public void CloseParserTabs()
         {
             CurrentDisplay.CloseTabs();
         }
@@ -236,7 +271,8 @@ namespace VisiBoole.Controllers
             if (CurrentDisplay is DisplayEdit)
             {
                 MainWindowController.LoadDisplay(DisplayType.RUN);
-                InstantiationClicks = new TreeNode();
+                InstantiationClicks = new TreeNode(DesignController.ActiveDesign.FileName);
+                InstantiationClicks.Name = DesignController.ActiveDesign.FileName;
             }
 
             // Add html to the current display
@@ -276,30 +312,6 @@ namespace VisiBoole.Controllers
             }
         }
 
-        /// <summary>
-        /// Handles the event that occurs when the user clicks on an independent variable.
-        /// </summary>
-        /// <param name="variableName">The name of the variable that was clicked by the user</param>
-        /// <param name="value">Value for formatter click</param>
-        public void Variable_Click(string variableName, string value = null)
-        {
-            Cursor.Current = Cursors.WaitCursor;
-            DisplayOutput(MainWindowController.Variable_Click(variableName, value));
-            
-            /*
-            if (InstantiationClicks.Nodes.Count > 0)
-            {
-                foreach (TreeNode node in InstantiationClicks.Nodes)
-                {
-                    Instantiation_Click(node.Text, false);
-                }
-            }
-            */
-
-            MainWindowController.RetrieveFocus();
-            Cursor.Current = Cursors.Default;
-        }
-
         private IEnumerable<TreeNode> Collect(TreeNodeCollection nodes)
         {
             foreach (TreeNode node in nodes)
@@ -307,10 +319,36 @@ namespace VisiBoole.Controllers
                 yield return node;
 
                 foreach (var child in Collect(node.Nodes))
-                {
                     yield return child;
+            }
+        }
+
+        /// <summary>
+        /// Handles the event that occurs when the user clicks on an independent variable.
+        /// </summary>
+        /// <param name="variableName">The name of the variable that was clicked by the user</param>
+        /// <param name="value">Value for formatter click</param>
+        public void Variable_Click(string variableName, string value = null)
+        {
+            var currentCursor = Cursor.Current;
+            Cursor.Current = Cursors.WaitCursor;
+
+            //var currentDesignName = DesignController.ActiveDesign.FileName;
+            DisplayOutput(MainWindowController.Variable_Click(variableName, value));
+            // If an instantiation is opened
+            if (InstantiationClicks.Nodes.Count > 0)
+            {
+                // For each instantiation open
+                foreach (TreeNode node in Collect(InstantiationClicks.Nodes))
+                {
+                    MainWindowController.SelectFile(node.Parent.Name);
+                    // Run instantiation for new values
+                    Instantiation_Click(node.Text, false);
                 }
             }
+
+            MainWindowController.RetrieveFocus();
+            Cursor.Current = currentCursor;
         }
 
         /// <summary>
@@ -319,40 +357,51 @@ namespace VisiBoole.Controllers
         /// <param name="instantiation">The instantiation that was clicked by the user</param>
         public void Instantiation_Click(string instantiation, bool addNode = true)
         {
-            /*
+            var currentCursor = Cursor.Current;
+            Cursor.Current = Cursors.WaitCursor;
+
             if (addNode)
             {
-                if (InstantiationClicks.Nodes.Count != 0)
+                string name = instantiation.TrimEnd('(');
+                if (DesignController.ActiveDesign.FileName == InstantiationClicks.Text)
                 {
-                    foreach (var node in Collect(InstantiationClicks.Nodes))
+                    if (!InstantiationClicks.Nodes.ContainsKey(name))
                     {
-                        if (node.Text.Split('.')[0] == DesignController.ActiveDesign.FileName)
-                        {
-                            node.Nodes.Add(instantiation);
-                        }
+                        var newNode = new TreeNode(name);
+                        newNode.Name = name;
+                        InstantiationClicks.Nodes.Add(newNode);
                     }
                 }
                 else
                 {
-                    InstantiationClicks.Nodes.Add(instantiation);
+                    foreach (TreeNode node in Collect(InstantiationClicks.Nodes))
+                    {
+                        if (node.Text.Split('.')[0] == DesignController.ActiveDesign.FileName)
+                        {
+                            var newNode = new TreeNode(name);
+                            newNode.Name = name;
+                            node.Nodes.Add(newNode);
+                            break;
+                        }
+                    }
                 }
             }
-            */
 
-            Cursor.Current = Cursors.WaitCursor;
-            List<IObjectCodeElement> output = MainWindowController.RunSubdesign(instantiation);
+            string instantName = instantiation.Split('.').Last().TrimEnd('(');
+            var output = MainWindowController.RunSubdesign(instantName);
             if (output == null)
             {
                 return;
             }
 
             string html = HtmlBuilder.GetHTML(output, true);
-            CurrentDisplay.AddTabComponent(instantiation.TrimEnd('('), html, addNode);
+            CurrentDisplay.AddTabComponent(string.Concat(string.Concat(DesignController.ActiveDesign.FileName, '.', instantName)), html, addNode);
             if (addNode)
             {
                 LastOutput = html;
             }
-            Cursor.Current = Cursors.Default;
+
+            Cursor.Current = currentCursor;
         }
     }
 }

@@ -65,26 +65,27 @@ namespace VisiBoole.Models
 
             foreach (List<IObjectCodeElement> line in newOutput)
             {
-                currentLine = "<p style=\"font-size:@SIZE@pt;\">";
+                currentLine = "<p style=\"font-size:@FONTSIZE@pt;\">";
 
                 if (line.Count == 0)
                 {
                     currentLine += "<br>";
                 }
 
-                bool outputSemicolons = Properties.Settings.Default.OutputSemicolons;
                 for (int i = 0; i < line.Count; i++)
                 {
                     IObjectCodeElement token = line[i];
 
                     if (token is Comment)
                     {
-                        // Add coloring tags to comment
-                        currentLine += ColorComment(token.ObjCodeText);
+                        // Add comment to the current line
+                        currentLine += EncodeText(token.ObjCodeText);
                         continue;
                     }
-                    else if (!outputSemicolons && token is Operator && token.ObjCodeText == ";")
+                    else if (token is Operator && token.ObjCodeText == ";")
                     {
+                        // Add comment to the current line
+                        currentLine += "<span style=\"display: @SEMICOLONDISPLAY@; font-size:@FONTSIZE@pt;\">;</span>";
                         continue;
                     }
 
@@ -121,14 +122,7 @@ namespace VisiBoole.Models
                     else
                     {
                         fontTag = true;
-                        if (!hasNegation)
-                        {
-                            color = ((bool)value) ? $"color=\"@TRUE@\"" : $"color=\"@FALSE@\"";
-                        }
-                        else
-                        {
-                            color = ((bool)value) ? $"color=\"@FALSE@\"" : $"color=\"@TRUE@\"";
-                        }
+                        color = ((bool)value) ? $"color=\"@TRUECOLOR@\"" : $"color=\"@FALSECOLOR@\"";
                         cursor = varType == typeof(IndependentVariable) && !isSubdesign ? "style=\"cursor:hand;" : "style=\"cursor:no-drop;";
                         decoration = hasNegation ? " text-decoration: overline;\"" : " \"";
                         action = cursor[14] == 'h' ? $"onclick=\"window.external.Variable_Click('{variable}')\"" : "";
@@ -152,115 +146,6 @@ namespace VisiBoole.Models
         }
 
         /// <summary>
-        /// Adds coloring to comments.
-        /// </summary>
-        /// <param name="comment">Base comment</param>
-        /// <returns>The comment with html coloring added</returns>
-        private string ColorComment(string comment)
-        {
-            MatchCollection matches = Regex.Matches(comment, @"(<#?[a-zA-Z0-9]+>)|(<\/>)");
-            if (matches.Count == 0)
-            {
-                // No special coloring specified
-                return EncodeText(comment);
-            }
-
-            StringBuilder commentHTML = new StringBuilder();
-            string appendText = "";
-            string color = "";
-
-            if (matches[0].Index != 0)
-            {
-                // Start comment
-                appendText = comment.Substring(0, matches[0].Index);
-                commentHTML.Append(EncodeText(appendText));
-            }
-
-            int indexOfMatch = 0;
-            int indexAfterMatch = 0;
-            int indexOfNextMatch = 0;
-            bool coloring = false;
-            bool isValidColor = true;
-            bool isClosingTag = false;
-
-            // Iterate through all matches and construct html
-            for (int i = 0; i < matches.Count; i++)
-            {
-                Match match = matches[i]; // Get match
-                indexOfMatch = match.Index; // Get match index
-                indexAfterMatch = indexOfMatch + match.Length; // Get index after match
-                indexOfNextMatch = (i + 1 < matches.Count) ? matches[i + 1].Index : -1; // Get index of next match
-                isClosingTag = match.Value == "</>";
-
-                if (!isClosingTag)
-                {
-                    color = match.Value.Substring(1, match.Length - 2); // Get color by removing <>
-
-                    // Check for true or false color
-                    if (color.Equals("true", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        color = "@TRUE@";
-                        isValidColor = true;
-                    }
-                    else if (color.Equals("false", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        color = "@FALSE@";
-                        isValidColor = true;
-                    }
-                    else
-                    {
-                        isValidColor = IsValidHTMLColor(color); // Check whether the provided color is valid
-                    }
-
-                    if (isValidColor)
-                    {
-                        if (coloring)
-                        {
-                            commentHTML.Append("</font>"); // Append closing color tag
-                        }
-                        commentHTML.Append($"<font color=\"{color}\">"); // Append color tag
-                        coloring = true;
-                    }
-                    else
-                    {
-                        commentHTML.Append(EncodeText(match.Value)); // Append bad color tag
-                    }
-                }
-                else
-                {
-                    if (coloring)
-                    {
-                        commentHTML.Append("</font>"); // Append closing color tag
-                        coloring = false;
-                    }
-                    else
-                    {
-                        commentHTML.Append(EncodeText(match.Value)); // Append bad closing tag
-                    }
-                }
-
-                if (indexOfNextMatch != -1)
-                {
-                    // There is another match
-                    appendText = comment.Substring(indexAfterMatch, indexOfNextMatch - indexAfterMatch);
-                    commentHTML.Append(EncodeText(appendText));
-                }
-                else
-                {
-                    // There are no other matches
-                    appendText = comment.Substring(indexAfterMatch, comment.Length - indexAfterMatch);
-                    commentHTML.Append(EncodeText(appendText));
-                    if (coloring)
-                    {
-                        commentHTML.Append("</font>");
-                    }
-                }
-            }
-
-            return commentHTML.ToString();
-        }
-
-        /// <summary>
         /// Encodes specific characters with their html encoding values. (This allows certain characters to show up in the simulator)
         /// </summary>
         /// <param name="comment">Comment to encode</param>
@@ -268,25 +153,10 @@ namespace VisiBoole.Models
         private string EncodeText(string comment)
         {
             // Replace specific characters with their encodings so they show in text
-            comment = Regex.Replace(comment, @"(?<=\s)\s", "&nbsp;");
+            comment = comment.Replace(" ", "&nbsp;");
             comment = comment.Replace("<", "&lt;");
             comment = comment.Replace(">", "&gt;");
-            return comment;
-        }
-
-        /// <summary>
-        /// Returns whether the provided color is a recognized color.
-        /// </summary>
-        /// <param name="color">Color to check</param>
-        /// <returns>Whether the color is a valid html color</returns>
-        private bool IsValidHTMLColor(string color)
-        {
-            if (Regex.IsMatch(color, @"^#(?:[0-9a-fA-F]{3}){1,2}$"))
-            {
-                return true;
-            }
-
-            return System.Drawing.Color.FromName(color).IsKnownColor;
+            return string.Concat("<span style=\"display: @COMMENTDISPLAY@; font-size:@FONTSIZE@pt;\">", comment, "</span>");
         }
 	}
 }

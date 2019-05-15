@@ -20,7 +20,7 @@ namespace CustomTabControl
     /// Delegate for tab closed events.
     /// </summary>
     /// <param name="sender"></param>
-    public delegate void TabClosedEventHandler(object sender, EventArgs eventArgs);
+    public delegate void TabXClickEventHandler(object sender, EventArgs eventArgs);
 
     /// <summary>
     /// Event arguments for a tab swap event
@@ -57,9 +57,9 @@ namespace CustomTabControl
         public event TabSwapEventHandler TabSwapped;
 
         /// <summary>
-        /// Event that occurs when a tab page is removed.
+        /// Event that occurs when the x on the tab is clicked.
         /// </summary>
-        public event TabClosedEventHandler TabClosed;
+        public event TabXClickEventHandler TabXClicked;
 
         /// <summary>
         /// Background color of the component.
@@ -152,14 +152,11 @@ namespace CustomTabControl
             if (clickedIndex >= 0)
             {
                 Tag = TabPages[clickedIndex];
-
                 Rectangle current = GetTabRect(clickedIndex);
                 Rectangle close = new Rectangle(current.Right - 18, current.Height - 16, 16, 16);
                 if (close.Contains(e.Location))
                 {
-                    TabPage closingTabPage = TabPages[clickedIndex];
-                    TabPages.RemoveAt(clickedIndex);
-                    TabClosed?.Invoke(closingTabPage, new EventArgs());
+                    TabXClicked?.Invoke(Tag, new EventArgs());
                 }
             }
         }
