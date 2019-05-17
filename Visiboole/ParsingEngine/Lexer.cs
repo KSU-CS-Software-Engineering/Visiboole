@@ -1139,7 +1139,7 @@ namespace VisiBoole.ParsingEngine
                         else if (previousToken.Type == TokenType.Constant)
                         {
                             // Add invalid constant error to error log
-                            ErrorLog.Add(CurrentLineNumber, $"Constants can’t be used on the left side of an assignment statement.");
+                            ErrorLog.Add(CurrentLineNumber, $"Constants canâ€™t be used on the left side of an assignment statement.");
                             // Return error statement type
                             return null;
                         }
