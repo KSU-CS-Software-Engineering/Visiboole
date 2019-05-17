@@ -214,6 +214,8 @@ namespace VisiBoole.ParsingEngine
         /// </summary>
         protected static readonly string VariableListPattern = $@"(?<Vars>{VariablePattern}(\s+{VariablePattern})*)";
 
+        protected static readonly string VariableListPattern2 = $@"(?<Vars>{VariablePattern}(\s+{VariablePattern})+)";
+
         /// <summary>
         /// Pattern for identifying concatenations.
         /// </summary>
