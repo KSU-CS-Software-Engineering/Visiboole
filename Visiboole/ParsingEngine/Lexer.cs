@@ -210,10 +210,13 @@ namespace VisiBoole.ParsingEngine
         protected static readonly string VariablePattern = $@"({VectorPattern}|{ConstantPattern}|{ScalarPattern})";
 
         /// <summary>
-        /// Pattern for identifying variable lists.
+        /// Pattern for identifying variable lists with one or more variables.
         /// </summary>
         protected static readonly string VariableListPattern = $@"(?<Vars>{VariablePattern}(\s+{VariablePattern})*)";
 
+        /// <summary>
+        /// Pattern for identifying variable lists with at least two variables.
+        /// </summary>
         protected static readonly string VariableListPattern2 = $@"(?<Vars>{VariablePattern}(\s+{VariablePattern})+)";
 
         /// <summary>
@@ -234,7 +237,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Pattern for identifying submodule instantiations.
         /// </summary>
-        public static readonly string InstantiationPattern = @"(?<Design>\w+)\.(?<Name>[a-zA-Z0-9]+)";
+        public static readonly string InstantPattern = @"(?<DesignName>\w+)\.(?<InstantName>[a-zA-Z0-9]+)";
 
         /// <summary>
         /// Pattern for identifying components (inputs or outputs) in a module notation.
@@ -284,7 +287,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Regex for identifying submodule instantiations.
         /// </summary>
-        private static Regex InstantiationRegex = new Regex($"^{InstantiationPattern}$");
+        protected static Regex InstantRegex = new Regex($"^{InstantPattern}$");
 
         #endregion
 
@@ -356,50 +359,24 @@ namespace VisiBoole.ParsingEngine
         private bool MathOperatorsValid;
 
         /// <summary>
-        /// Operators lists for the current execution.
-        /// </summary>
-        //private List<List<Token>> Operators;
-
-        /// <summary>
         /// List of parentheses levels.
         /// </summary>
         private List<ParenthesesLevel> Parentheses;
 
+        /// <summary>
+        /// List of operations.
+        /// </summary>
         private List<TokenType> Operations;
-
-        /// <summary>
-        /// List of libraries included for this instance.
-        /// </summary>
-        protected List<string> Libraries;
-
-        /// <summary>
-        /// Dictionary of submodules for this instance.
-        /// </summary>
-        public Dictionary<string, Design> Subdesigns;
-
-        /// <summary>
-        /// Dictionary of instantiations for this instance.
-        /// </summary>
-        public Dictionary<string, string> Instantiations;
 
         #endregion
 
         /// <summary>
-        /// Constructs a lexer to verify the design.
+        /// Constructs a lexer to verify designs.
         /// </summary>
-        /// <param name="design">Design to parse</param>
-        protected Lexer(Design design)
+        protected Lexer()
         {
-            // Save design to perform lexical analysis on
-            Design = design;
             // Init error log dictionary
             ErrorLog = new Dictionary<int, string>();
-            // Init libraries list
-            Libraries = new List<string>();
-            // Init subdesigns dictionary
-            Subdesigns = new Dictionary<string, Design>();
-            // Init instantiations dictionary
-            Instantiations = new Dictionary<string, string>();
         }
 
         #region Token Identification
@@ -746,7 +723,7 @@ namespace VisiBoole.ParsingEngine
                 return TokenType.Formatter;
             }
             // If current lexeme is an instantiation and next lexeme is an open parenthesis
-            else if (InstantiationRegex.IsMatch(currentLexeme) && firstCharInNextLexeme == '(')
+            else if (InstantRegex.IsMatch(currentLexeme) && firstCharInNextLexeme == '(')
             {
                 // Return token type instantiation
                 return TokenType.Instantiation;
@@ -914,8 +891,8 @@ namespace VisiBoole.ParsingEngine
                     return false;
                 }
 
-                // Return whether the line is a valid instantiation statement
-                return ValidateInstantiation(InstantiationRegex.Match(token.Text), line);
+                // Return whether the design instant is valid
+                return ValidateInstant(InstantRegex.Match(token.Text));
             }
             // If token type is declaration
             else if (token.Type == TokenType.Declaration)
@@ -1556,15 +1533,14 @@ namespace VisiBoole.ParsingEngine
         #region Token Validation
 
         /// <summary>
-        /// Validates a submodule instantiation.
+        /// Validates a design instant.
         /// </summary>
-        /// <param name="instantiationMatch">Instantiation</param>
-        /// <param name="line">Line of instantiation</param>
-        /// <returns>Whether the instantiation is valid</returns>
-        private bool ValidateInstantiation(Match instantiationMatch, string line)
+        /// <param name="instantMatch">Design instant containing the design name and instant name</param>
+        /// <returns>Whether the instant is valid</returns>
+        private bool ValidateInstant(Match instantMatch)
         {
-            string designName = instantiationMatch.Groups["Design"].Value;
-            string instantiationName = instantiationMatch.Groups["Name"].Value;
+            string designName = instantMatch.Groups["DesignName"].Value;
+            string instantName = instantMatch.Groups["InstantName"].Value;
 
             if (designName == Design.FileName)
             {
@@ -1572,16 +1548,16 @@ namespace VisiBoole.ParsingEngine
                 return false;
             }
 
-            if (Instantiations.ContainsKey(instantiationName))
+            if (Design.Database.Instantiations.ContainsKey(instantName))
             {
-                ErrorLog.Add(CurrentLineNumber, $"Instantiation name '{instantiationName}' is already being used.");
+                ErrorLog.Add(CurrentLineNumber, $"Instantiation name '{instantName}' is already being used.");
                 return false;
             }
             else
             {
                 try
                 {
-                    if (!Subdesigns.ContainsKey(designName))
+                    if (!Design.Database.Subdesigns.ContainsKey(designName))
                     {
                         Design subDesign = null;
                         string[] files = Directory.GetFiles(Design.FileSource.DirectoryName, string.Concat(designName, ".vbi"));
@@ -1590,20 +1566,20 @@ namespace VisiBoole.ParsingEngine
                             // Create new design from the design path
                             Design newDesign = new Design(files[0]);
                             // Set sub design if it has a header line
-                            subDesign = newDesign.HeaderLine != null ? newDesign : null;
+                            subDesign = newDesign.Database.Header != null ? newDesign : null;
                         }
 
                         if (subDesign == null)
                         {
-                            for (int i = 0; i < Libraries.Count; i++)
+                            for (int i = 0; i < Design.Database.Libraries.Count; i++)
                             {
-                                files = Directory.GetFiles(Libraries[i], string.Concat(designName, ".vbi"));
+                                files = Directory.GetFiles(Design.Database.Libraries[i], string.Concat(designName, ".vbi"));
                                 if (files.Length > 0)
                                 {
                                     // Create new design from the design path
                                     Design newDesign = new Design(files[0]);
                                     // Set sub design if it has a header line
-                                    subDesign = newDesign.HeaderLine != null ? newDesign : null;
+                                    subDesign = newDesign.Database.Header != null ? newDesign : null;
                                     // If the sub design was found
                                     if (subDesign != null)
                                     {
@@ -1622,14 +1598,10 @@ namespace VisiBoole.ParsingEngine
                             }
                         }
 
-                        Subdesigns.Add(designName, subDesign);
-                        Instantiations.Add(instantiationName, line);
-                    }
-                    else
-                    {
-                        Instantiations.Add(instantiationName, line);
+                        Design.Database.Subdesigns.Add(designName, subDesign);
                     }
 
+                    Design.Database.Instantiations.Add(instantName, null);
                     return true;
                 }
                 catch (Exception)

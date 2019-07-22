@@ -72,7 +72,7 @@ namespace VisiBoole.ParsingEngine.Statements
         /// <summary>
         /// Updates the next value for the clock statement.
         /// </summary>
-        public void Update()
+        public void Compute()
         {
             NextValue = Expression.DependentBinary;
         }

@@ -96,7 +96,7 @@ namespace CustomTabControl
             AllowDrop = true;
             ShowToolTips = true;
             SizeMode = TabSizeMode.Fixed;
-            ItemSize = new Size(125, 25);
+            ItemSize = new Size(150, 25);
             DrawMode = TabDrawMode.OwnerDrawFixed;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.DoubleBuffer, true);
 
@@ -129,10 +129,10 @@ namespace CustomTabControl
                 boundaryPen.Dispose();
 
                 // Draw closing X
-                pevent.Graphics.DrawImage(VisiBoole.Properties.Resources.Close, TabBoundary.Right - 19, TabBoundary.Height - 18);
+                pevent.Graphics.DrawImage(VisiBoole.Properties.Resources.Close, TabBoundary.Right - 21, TabBoundary.Height - 19);
 
                 // Draw text
-                Rectangle TabTextBoundary = new Rectangle(TabBoundary.X + 2, TabBoundary.Y + 2, TabBoundary.Width - 17, TabBoundary.Height - 2);
+                Rectangle TabTextBoundary = new Rectangle(TabBoundary.X, TabBoundary.Y + 1, TabBoundary.Width - 18, TabBoundary.Height - 2);
                 Color fontColor = index == SelectedIndex ? SelectedTabTextColor : TabTextColor;
                 TextRenderer.DrawText(pevent.Graphics, tab.Text, Font, TabTextBoundary, fontColor, TextFormatFlags.WordEllipsis);
             }
@@ -153,7 +153,7 @@ namespace CustomTabControl
             {
                 Tag = TabPages[clickedIndex];
                 Rectangle current = GetTabRect(clickedIndex);
-                Rectangle close = new Rectangle(current.Right - 18, current.Height - 16, 16, 16);
+                Rectangle close = new Rectangle(current.Right - 21, current.Height - 19, 16, 16);
                 if (close.Contains(e.Location))
                 {
                     TabXClicked?.Invoke(Tag, new EventArgs());

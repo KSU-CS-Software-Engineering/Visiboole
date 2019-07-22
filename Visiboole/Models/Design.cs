@@ -3,10 +3,13 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Runtime.Serialization.Formatters.Binary;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Ionic;
 using VisiBoole.ParsingEngine;
+using VisiBoole.ParsingEngine.ObjectCode;
+using VisiBoole.ParsingEngine.Statements;
 
 namespace VisiBoole.Models
 {
@@ -63,20 +66,20 @@ namespace VisiBoole.Models
         public Stack UndoHistory { get; private set; }
 
         /// <summary>
-        /// Regex for identifying a module declaration.
+        /// Regex for identifying a design headers.
         /// </summary>
-        private Regex ModuleRegex;
+        private Regex HeaderRegex;
 
         /// <summary>
-        /// Module declaration of the design. (if exists)
+        /// Opened instantiation of the design (if any).
         /// </summary>
-        public string HeaderLine { get; set; }
+        public string OpenedInstantiation { get; private set; }
 
         /// <summary>
         /// Constructs a new Design object
         /// </summary>
         /// <param name="filename">The path of the file source for this Design</param>
-        public Design(string filename)
+        public Design(string filename, string fileText = null, DesignHeader header = null)
         {
             if (string.IsNullOrEmpty(filename))
             {
@@ -85,17 +88,21 @@ namespace VisiBoole.Models
 
             FileSource = new FileInfo(filename);
             FileName = FileSource.Name.Split('.')[0];
-            ModuleRegex = new Regex($@"^\s*{FileName}\({Parser.ModulePattern}\);$", RegexOptions.Compiled);
+            HeaderRegex = new Regex($@"^\s*{FileName}\({Parser.ModulePattern}\);$", RegexOptions.Compiled);
 
             if (!File.Exists(filename))
             {
                 FileSource.Create().Close();
             }
 
-            Text = GetFileText();
+            Database = new Database();
+            Text = fileText == null ? GetFileText() : fileText;
+            if (header != null)
+            {
+                Database.Header = header;
+            }
             LastText = Text;
             IsDirty = false;
-            Database = new Database();
             EditHistory = new Stack();
             UndoHistory = new Stack();
 
@@ -108,6 +115,11 @@ namespace VisiBoole.Models
 
             SetTheme();
             SetFontSize();
+        }
+
+        public Design Clone()
+        {
+            return new Design(FileSource.FullName, Text, Database.Header);
         }
 
         /// <summary>
@@ -190,9 +202,10 @@ namespace VisiBoole.Models
 
                                 if (currentStatement[0] != '#')
                                 {
-                                    if (ModuleRegex.IsMatch(currentStatement))
+                                    if (HeaderRegex.IsMatch(currentStatement))
                                     {
-                                        HeaderLine = currentStatement;
+                                        Parser parser = new Parser();
+                                        Database.Header = parser.CreateHeader(currentStatement);
                                     }
                                     else
                                     {
@@ -613,5 +626,218 @@ namespace VisiBoole.Models
                 }
             }
         }
+
+        #region Parser Methods
+
+        /// <summary>
+        /// Exports the independent variables of the design.
+        /// </summary>
+        /// <returns></returns>
+        public List<Variable> ExportState()
+        {
+            var variables = new List<Variable>();
+            foreach (Variable var in Database.AllVars.Values)
+            {
+                if (var.GetType() == typeof(IndependentVariable))
+                {
+                    variables.Add(var);
+                }
+            }
+            return variables;
+        }
+
+        /// <summary>
+        /// Gets output from the statement list.
+        /// </summary>
+        /// <returns>Parsed output</returns>
+        public List<IObjectCodeElement> GetOutput()
+        {
+            // Parse statements for output
+            var output = new List<IObjectCodeElement>();
+            foreach (var statement in Database.Statements)
+            {
+                output.AddRange(statement.Parse()); // Add output
+            }
+
+            return output;
+        }
+
+        #endregion
+
+        #region Click Methods
+
+        /// <summary>
+        /// Clicks the provided variable(s).
+        /// </summary>
+        /// <param name="variableName">Variable clicked</param>
+        /// <param name="value">Value of the click (formatters).</param>
+        /// <returns>Output to be displayed.</returns>
+        public void ClickVariables(string variableName, string value = null)
+        {
+            string[] variables;
+            // If there is only one variable to click
+            if (variableName[0] != '{')
+            {
+                // Create variables with the single variable to click
+                variables = new string[] { variableName };
+                // Flip the value of the single variable
+                Database.FlipValue(variableName);
+            }
+            // If there are multiple variables to click (formatter)
+            else
+            {
+                // Get all variables to set the value of
+                variables = Parser.WhitespaceRegex.Split(variableName.Substring(1));
+                // Set the values of all the variables to their next value
+                Database.SetValues(variables, value);
+            }
+
+            // Run all instantiations
+            TryRunInstantiations(false);
+            // Update all clock statements' next values
+            ComputeClocks();
+        }
+
+        #endregion
+
+        #region Clock Methods
+
+        public void TickClocks()
+        {
+            // For all clock statements
+            foreach (var clockStatement in Database.ClockStatements)
+            {
+                // If clock statement is not drived by an alternate clock
+                if (clockStatement.Clock == null)
+                {
+                    // Tick the clock statement
+                    clockStatement.Tick();
+                }
+            }
+
+            // Run all instantiations
+            TryRunInstantiations(true);
+            // Update all clock statements' next values
+            ComputeClocks();
+        }
+
+        /// <summary>
+        /// Updates all clock statements' next values.
+        /// </summary>
+        public void ComputeClocks()
+        {
+            foreach (var clockStatement in Database.ClockStatements)
+            {
+                clockStatement.Compute();
+            }
+        }
+
+        #endregion
+
+        #region Instantiation Methods
+
+        /// <summary>
+        /// Runs any present submodules. Returns whether there was an error.
+        /// </summary>
+        /// <returns>Whether there was an error</returns>
+        public bool TryRunInstantiations(bool tick)
+        {
+            // For all instantiation statements
+            foreach (var instantationStatement in Database.InstantiationStatements)
+            {
+                // If instantiation wasn't able to run
+                if (!instantationStatement.TryRunInstance(tick))
+                {
+                    // Return false for error
+                    return false;
+                }
+            }
+
+            bool reset;
+            do
+            {
+                // Start reset at false
+                reset = false;
+                // For all instantiation statements
+                foreach (var instantationStatement in Database.InstantiationStatements)
+                {
+                    // If instantiation needs to be reran
+                    if (instantationStatement.CheckRerun())
+                    {
+                        // Set reset to true
+                        reset = true;
+                    }
+                }
+            } while (reset == true);
+
+            // Return true for no errors
+            return true;
+        }
+
+        /// <summary>
+        /// Closes the active instantiation.
+        /// </summary>
+        public void CloseActiveInstantiation()
+        {
+            if (OpenedInstantiation != null)
+            {
+                Database.Instantiations[OpenedInstantiation].CloseInstantiations();
+                OpenedInstantiation = null;
+            }
+        }
+
+        public void CloseInstantiation(string instantiation)
+        {
+            if (instantiation.Split('.')[0] == FileName)
+            {
+                CloseActiveInstantiation();
+            }
+            else if (OpenedInstantiation != null)
+            {
+                Database.Instantiations[OpenedInstantiation].CloseInstantiation(instantiation);
+            }
+        }
+
+        public List<IObjectCodeElement> OpenInstantiation(string instantiation)
+        {
+            string[] instantParts = instantiation.Split('.');
+            if (instantParts[0] == FileName)
+            {
+                var output = Database.Instantiations[instantParts[1]].OpenInstantiation();
+                OpenedInstantiation = instantParts[1];
+                return output;
+            }
+            else
+            {
+                return Database.Instantiations[OpenedInstantiation].OpenInstantiation(instantiation);
+            }
+        }
+
+        /// <summary>
+        /// Returns the design of the provided instantiation.
+        /// </summary>
+        /// <param name="instantiation">Instantiation to get the design of.</param>
+        /// <returns>Design of the provided instantiation.</returns>
+        public Design GetInstantiationDesign(string instantiation)
+        {
+            string[] instantParts = instantiation.Split('.');
+            if (instantParts[0] == FileName)
+            {
+                return Database.Instantiations[instantParts[1]].GetDesign();
+            }
+            else
+            {
+                if (OpenedInstantiation == null)
+                {
+                    return null;
+                }
+                else
+                {
+                    return Database.Instantiations[OpenedInstantiation].GetDesign(instantiation);
+                }
+            }
+        }
+
+        #endregion
     }
 }
