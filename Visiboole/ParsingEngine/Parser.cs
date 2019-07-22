@@ -272,6 +272,7 @@ namespace VisiBoole.ParsingEngine
             Design = design;
             // Init Design
             Design.Database = new Database();
+            ErrorLog = new Dictionary<int, string>();
 
             // If unable to parse statements
             if (!TryParseStatements())
@@ -326,15 +327,7 @@ namespace VisiBoole.ParsingEngine
         {
             Design = design;
             bool isUpdate = Design.Database.Statements.Count > 0;
-
-            /*
-            // Check design for valid module declaration
-            if (Design.Header == null || !Regex.IsMatch(Design.Header, ModulePattern))
-            {
-                ErrorListBox.Display(new List<string>(new string[] { $"The module file '{Design.FileName}' did not contain a matching module statement." }));
-                return null;
-            }
-            */
+            ErrorLog = new Dictionary<int, string>();
 
             // If unable to parse statements
             if (!isUpdate && !TryParseStatements())
@@ -702,7 +695,13 @@ namespace VisiBoole.ParsingEngine
                 CurrentLineNumber += source.Text.Count(c => c == '\n') + 1;
             }
 
-            if (Design.Database.Header != null)
+            if (Design.Database.Header != null && !Design.Database.Header.Valid)
+            {
+                ErrorLog.Add(headerLineNumber, $"All vectors in Headers must have explicit dimensions.");
+                // Set valid to false
+                valid = false;
+            }
+            else if (Design.Database.Header != null)
             {
                 string inputCheck = Design.Database.Header.VerifyInputs();
                 if (inputCheck != null)
@@ -722,12 +721,7 @@ namespace VisiBoole.ParsingEngine
                     }
                 }
             }
-            else if (Design.Database.Header != null && !Design.Database.Header.Valid)
-            {
-                ErrorLog.Add(headerLineNumber, $"All vectors in Headers must have explicit dimensions.");
-                // Set valid to false
-                valid = false;
-            }
+            
 
             // If execution is valid: return expanded source code list
             // Otherwise: return null
@@ -1157,7 +1151,7 @@ namespace VisiBoole.ParsingEngine
         {
             if (token.Value.Contains("[") && string.IsNullOrEmpty(token.Groups["LeftBound"].Value))
             {
-                var components = Design.Database.GetVectorComponents(token.Groups["Name"].Value).ToArray();
+                var components = Design.Database.GetVectorComponents(token.Groups["Name"].Value)?.ToArray();
                 if (components == null)
                 {
                     ErrorLog.Add(CurrentLineNumber, $"'{token.Value}' is missing an explicit dimension.");
@@ -1320,7 +1314,6 @@ namespace VisiBoole.ParsingEngine
             {
                 if (match.Value.Contains("[]") && type == StatementType.Header)
                 {
-                    ErrorLog.Add(GetLineNumber(expandedLine, match.Index), $"Vector '{match.Value}' must have explicit dimensions in header statements.");
                     return null;
                 }
 
