@@ -98,7 +98,7 @@ namespace VisiBoole.Controllers
             var designTabControl = new NewTabControl();
             designTabControl.Font = new Font("Segoe UI", 10.75F);
             designTabControl.SelectedTabColor = Color.DodgerBlue;
-            designTabControl.TabBoundaryColor = Color.Black;
+            designTabControl.TabBoundaryColor = SystemColors.ControlDarkDark;
             designTabControl.SelectedTabTextColor = Color.White;
             designTabControl.TabSwapped += (sender, e) => {
                 MainWindowController.SwapDesignNodes(e.SourceTabPageIndex, e.DestinationTabPageIndex);
@@ -107,7 +107,7 @@ namespace VisiBoole.Controllers
             var browserTabControl = new NewTabControl();
             browserTabControl.Font = new Font("Segoe UI", 10.75F);
             browserTabControl.SelectedTabColor = Color.DodgerBlue;
-            browserTabControl.TabBoundaryColor = Color.Black;
+            browserTabControl.TabBoundaryColor = SystemColors.ControlDarkDark;
             browserTabControl.SelectedTabTextColor = Color.White;
 
             // Create html builder
@@ -140,9 +140,13 @@ namespace VisiBoole.Controllers
                         // Select top level
                         MainWindowController.SelectFile(InstantiationClicks.Text);
                     }
+
                     // Select the tab associated with the tab
                     MainWindowController.SelectFile(tabName);
                 }
+            };
+            RunDisplay.DisplayTabClosing += (tabName) => {
+                CurrentDisplay.CloseTab(tabName);
             };
             RunDisplay.DisplayTabClosed += (tabName, tabCount) => {
                 // If the tab is an instantiation parser
@@ -153,6 +157,7 @@ namespace VisiBoole.Controllers
                         // Select top level
                         MainWindowController.SelectFile(InstantiationClicks.Text);
                     }
+
                     // Close parser associated with the tab
                     MainWindowController.CloseInstantiation(tabName);
 
@@ -175,15 +180,8 @@ namespace VisiBoole.Controllers
                 {
                     // Select the tab associated with the tab
                     MainWindowController.SelectFile(tabName);
+                    MainWindowController.SuspendRunDisplay();
 
-                    if (tabCount > 0)
-                    {
-                        MainWindowController.SuspendRunDisplay();
-                    }
-                }
-
-                if (tabCount == 0)
-                {
                     if (CurrentDisplay is DisplayRun)
                     {
                         MainWindowController.LoadDisplay(DisplayType.EDIT);
@@ -345,6 +343,11 @@ namespace VisiBoole.Controllers
             }
         }
 
+        /// <summary>
+        /// Returns all child nodes of the provided tree node.
+        /// </summary>
+        /// <param name="nodes">Node to collect the children from.</param>
+        /// <returns>All child nodes of the provided tree node.</returns>
         private IEnumerable<TreeNode> Collect(TreeNodeCollection nodes)
         {
             foreach (TreeNode node in nodes)

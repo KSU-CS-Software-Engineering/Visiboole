@@ -116,6 +116,7 @@ namespace CustomTabControl
                 // Get tab info
                 int index = TabPages.IndexOf(tab);
                 Rectangle TabBoundary = GetTabRect(index);
+                TabBoundary.Inflate(1, 1);
 
                 // Draw tab
                 Color tabColor = index == SelectedIndex ? SelectedTabColor : TabColor;
@@ -124,15 +125,13 @@ namespace CustomTabControl
                 tabBrush.Dispose();
 
                 // Draw tab boundary
-                Pen boundaryPen = new Pen(TabBoundaryColor);
-                pevent.Graphics.DrawRectangle(boundaryPen, TabBoundary);
-                boundaryPen.Dispose();
-
+                ControlPaint.DrawBorder(pevent.Graphics, TabBoundary, TabBoundaryColor, ButtonBorderStyle.Outset);
+  
                 // Draw closing X
-                pevent.Graphics.DrawImage(VisiBoole.Properties.Resources.Close, TabBoundary.Right - 21, TabBoundary.Height - 19);
+                pevent.Graphics.DrawImage(VisiBoole.Properties.Resources.Close, TabBoundary.Right - 23, TabBoundary.Height - 23);
 
                 // Draw text
-                Rectangle TabTextBoundary = new Rectangle(TabBoundary.X, TabBoundary.Y + 1, TabBoundary.Width - 18, TabBoundary.Height - 2);
+                Rectangle TabTextBoundary = new Rectangle(TabBoundary.X, TabBoundary.Y, TabBoundary.Width - 18, TabBoundary.Height - 2);
                 Color fontColor = index == SelectedIndex ? SelectedTabTextColor : TabTextColor;
                 TextRenderer.DrawText(pevent.Graphics, tab.Text, Font, TabTextBoundary, fontColor, TextFormatFlags.WordEllipsis);
             }

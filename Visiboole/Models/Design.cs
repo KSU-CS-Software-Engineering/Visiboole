@@ -224,7 +224,7 @@ namespace VisiBoole.Models
                     text += nextLine + "\n";
                 }
             }
-            return text;
+            return text.TrimEnd('\n');
         }
 
         /// <summary>
