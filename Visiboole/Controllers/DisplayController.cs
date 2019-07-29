@@ -318,15 +318,8 @@ namespace VisiBoole.Controllers
         /// <param name="count">Number of times to tick</param>
         public void Tick(int count)
         {
-            var currentDesign = DesignController.ActiveDesign;
-
             for (int i = 0; i < count; i++)
             {
-                if (DesignController.ActiveDesign.FileName != InstantiationClicks.Text)
-                {
-                    // Select top level
-                    MainWindowController.SelectFile(InstantiationClicks.Text);
-                }
                 DisplayOutput(MainWindowController.Tick(), false);
 
                 // If an instantiation is opened
@@ -339,6 +332,9 @@ namespace VisiBoole.Controllers
                         // Run instantiation for new values
                         Instantiation_Click(node.Text, false);
                     }
+
+                    // Select top level
+                    MainWindowController.SelectFile(InstantiationClicks.Text);
                 }
             }
         }
@@ -380,6 +376,8 @@ namespace VisiBoole.Controllers
                     // Run instantiation for new values
                     Instantiation_Click(node.Text, false);
                 }
+
+                MainWindowController.SelectFile(InstantiationClicks.Text);
             }
 
             MainWindowController.RetrieveFocus();

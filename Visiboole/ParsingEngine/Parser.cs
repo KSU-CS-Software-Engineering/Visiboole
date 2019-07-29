@@ -1317,7 +1317,7 @@ namespace VisiBoole.ParsingEngine
                     return null;
                 }
 
-                var expansion = GetExpansion(match).ToArray();
+                var expansion = GetExpansion(match)?.ToArray();
                 if (expansion == null)
                 {
                     ErrorLog.Add(GetLineNumber(expandedLine, match.Index), $"'{match.Value}' is missing an explicit dimension somewhere.");
@@ -1341,7 +1341,7 @@ namespace VisiBoole.ParsingEngine
                     {
                         match = constant;
 
-                        var expansion = GetExpansion(match).ToArray();
+                        var expansion = GetExpansion(match)?.ToArray();
                         if (expansion.Length > maxExpansionCount)
                         {
                             maxExpansionCount = expansion.Length;
@@ -1358,7 +1358,7 @@ namespace VisiBoole.ParsingEngine
             {
                 while ((match = ConcatRegex.Match(expandedLine)).Success)
                 {
-                    var expansion = GetExpansion(match).ToArray();
+                    var expansion = GetExpansion(match)?.ToArray();
                     if (expansion == null)
                     {
                         ErrorLog.Add(GetLineNumber(expandedLine, match.Index), $"'{match.Value}' is missing an explicit dimension somewhere.");
@@ -1430,7 +1430,7 @@ namespace VisiBoole.ParsingEngine
             Match dependentMatch = AnyTypeRegex.Match(dependent);
             if (dependentMatch.Value.Contains("{"))
             {
-                dependentExpansion = GetExpansion(dependentMatch).ToList();
+                dependentExpansion = GetExpansion(dependentMatch)?.ToList();
                 // If expansion fails
                 if (dependentExpansion == null)
                 {
@@ -1440,7 +1440,7 @@ namespace VisiBoole.ParsingEngine
             }
             else if (dependentMatch.Value.Contains("["))
             {
-                dependentExpansion = ExpandToken(dependentMatch).ToList();
+                dependentExpansion = ExpandToken(dependentMatch)?.ToList();
                 // If expansion fails
                 if (dependentExpansion == null)
                 {
@@ -1465,12 +1465,12 @@ namespace VisiBoole.ParsingEngine
                     if (!match.Value.Contains("{"))
                     {
                         canAdjust = !match.Value.Contains("[") && string.IsNullOrEmpty(match.Groups["BitCount"].Value);
-                        expansion = ExpandToken(match).ToList();
+                        expansion = ExpandToken(match)?.ToList();
                     }
                     else
                     {
                         canAdjust = false;
-                        expansion = GetExpansion(match).ToList();
+                        expansion = GetExpansion(match)?.ToList();
                     }
 
                     // If expansion fails
@@ -1519,7 +1519,8 @@ namespace VisiBoole.ParsingEngine
             expansions.Add(dependentExpansion);
             expansions.AddRange(expressionExpansions);
 
-            if (matches.Count == 1 && (matches[0].Value[0] == '\'' || char.IsDigit(matches[0].Value[0])))
+            if (matches.Count == 1 && expression.TrimEnd(';') == matches[0].Value &&
+                (matches[0].Value[0] == '\'' || char.IsDigit(matches[0].Value[0])))
             {
                 string newLine = line;
 

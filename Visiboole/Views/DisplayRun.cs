@@ -79,6 +79,27 @@ namespace VisiBoole.Views
         }
 
         /// <summary>
+        /// Updates the tick buttons based on the provided bool.
+        /// </summary>
+        /// <param name="enableTicks"></param>
+        public void UpdateTickControls(bool enableTicks)
+        {
+            btnMultiTick.Enabled = enableTicks;
+            btnTick.Enabled = enableTicks;
+            numericUpDown1.Enabled = enableTicks;
+            btnMultiTick.BackColor = enableTicks ? Color.Transparent : Color.DarkGray;
+            btnTick.BackColor = enableTicks ? Color.Transparent : Color.DarkGray;
+            if (Properties.Settings.Default.Theme == "Light" || Properties.Settings.Default.Theme == "light")
+            {
+                numericUpDown1.BackColor = enableTicks ? Color.FloralWhite : Color.DarkGray;
+            }
+            else
+            {
+                numericUpDown1.BackColor = enableTicks ? SystemColors.Window : Color.DarkGray;
+            }
+        }
+
+        /// <summary>
 		/// Loads the given tab control into this display.
 		/// </summary>
 		/// <param name="tabControl">The tabcontrol that will be loaded by this display</param>
@@ -87,6 +108,10 @@ namespace VisiBoole.Views
             TabControl = tabControl;
             TabControl.SelectedIndexChanged += (sender, eventArgs) => {
                 string tabName = TabControl.SelectedIndex != -1 ? TabControl.TabPages[TabControl.SelectedIndex].Text : null;
+                if (tabName != null)
+                {
+                    UpdateTickControls(!tabName.Contains("."));
+                }
                 DisplayTabChanged?.Invoke(tabName);
             };
             TabControl.TabXClicked += (sender, eventArgs) => {
@@ -264,6 +289,7 @@ namespace VisiBoole.Views
                 if (swap)
                 {
                     TabControl.SelectedTab = newTabPage;
+                    UpdateTickControls(!name.Contains("."));
                 }
             }
             else
