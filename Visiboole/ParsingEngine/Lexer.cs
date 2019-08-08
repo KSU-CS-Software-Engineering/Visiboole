@@ -242,7 +242,7 @@ namespace VisiBoole.ParsingEngine
         /// <summary>
         /// Pattern for identifying components (inputs or outputs) in a module notation.
         /// </summary>
-        private static readonly string ModuleComponentPattern = $@"(({AnyTypePattern}|{VariableListPattern})(,\s*({AnyTypePattern}|{VariableListPattern}))*)";
+        private static readonly string ModuleComponentPattern = $@"(({AnyTypePattern}|{VariableListPattern})((\n* *)?,\s*({AnyTypePattern}|{VariableListPattern}))*)";
 
         /// <summary>
         /// Pattern for identifying modules.
@@ -275,11 +275,6 @@ namespace VisiBoole.ParsingEngine
         private static Regex ConstantTokenRegex = new Regex($"^{ConstantPattern}$", RegexOptions.Compiled);
 
         /// <summary>
-        /// Regex for identifiyng appended operator lexemes.
-        /// </summary>
-        private static Regex MulticharacterOperatorLexemeRegex = new Regex(@"^(\~+|\*+|=|(==)|(<=))$", RegexOptions.Compiled);
-
-        /// <summary>
         /// Regex for identifying formatters.
         /// </summary>
         private static Regex FormatterRegex = new Regex($"^{FormatterPattern}$", RegexOptions.Compiled);
@@ -305,11 +300,6 @@ namespace VisiBoole.ParsingEngine
         public static readonly IList<string> OperatorsList = new ReadOnlyCollection<string>(new List<string> { "^", "|", "+", "-", "==", " " });
 
         /// <summary>
-        /// List of exclusive operators.
-        /// </summary>
-        private static readonly IList<string> ExclusiveOperatorsList = new ReadOnlyCollection<string>(new List<string> { "^", "+", "-", "==" });
-
-        /// <summary>
         /// Memo for vector expansions.
         /// </summary>
         protected static Dictionary<string, IEnumerable<string>> ExpansionMemo = new Dictionary<string, IEnumerable<string>>();
@@ -327,6 +317,11 @@ namespace VisiBoole.ParsingEngine
         /// Dictionary of errors.
         /// </summary>
         protected Dictionary<int, string> ErrorLog;
+
+        /// <summary>
+        /// Pending error message to be added to the error log.
+        /// </summary>
+        protected string PendingErrorMessage;
 
         /// <summary>
         /// Line number of the design being parsed.
@@ -377,6 +372,8 @@ namespace VisiBoole.ParsingEngine
         {
             // Init error log dictionary
             ErrorLog = new Dictionary<int, string>();
+            // Init pending error
+            PendingErrorMessage = null;
         }
 
         #region Token Identification

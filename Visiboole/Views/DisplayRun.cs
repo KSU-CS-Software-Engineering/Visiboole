@@ -241,6 +241,7 @@ namespace VisiBoole.Views
                 browser.AllowWebBrowserDrop = false;
                 browser.WebBrowserShortcutsEnabled = false;
                 browser.ObjectForScripting = Controller;
+                browser.ScriptErrorsSuppressed = true;
 
                 // Create browser with empty body
                 //browser.DocumentText = CreateDocumentText(html);

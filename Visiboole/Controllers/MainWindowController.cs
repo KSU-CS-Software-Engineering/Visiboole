@@ -50,6 +50,14 @@ namespace VisiBoole.Controllers
         private IDesignController DesignController;
 
         /// <summary>
+        /// Error message for unfound errors while parsing.
+        /// </summary>
+        private string UnfoundErrorMessage =
+            "An unforeseen error has occured while parsing this vbi file."
+            + " It is most likely a strange syntax error or stray special character in the file."
+            + " Please email a copy to jdevore@ksu.edu before trying to isolate the offending line.";
+
+        /// <summary>
         /// Constructs an instance of MainWindowController with handles to its view and the controllers
         /// </summary>
         /// <param name="mainWindow">Handle to the MainWindow which is the view for this controller</param>
@@ -305,10 +313,9 @@ namespace VisiBoole.Controllers
                 }
                 DisplayController.DisplayOutput(output);
             }
-            catch (Exception exception)
+            catch (Exception)
             {
-                DialogBox.New("Error", exception.ToString(), DialogType.Ok);
-                // Leave this error message for debugging purposes
+                DialogBox.New("Error", UnfoundErrorMessage, DialogType.Ok);
             }
         }
 
@@ -326,10 +333,9 @@ namespace VisiBoole.Controllers
                 }
                 DisplayController.DisplayOutput(output);
             }
-            catch (Exception exception)
+            catch (Exception)
             {
-                DialogBox.New("Error", exception.ToString(), DialogType.Ok);
-                // Leave this error message for debugging purposes
+                DialogBox.New("Error", UnfoundErrorMessage, DialogType.Ok);
             }
         }
 

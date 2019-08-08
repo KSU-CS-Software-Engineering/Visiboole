@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Drawing;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
@@ -112,6 +113,7 @@ namespace VisiBoole.Models
 
             AcceptsTab = true;
             ShowLineNumbers = true;
+            AutoWordSelection = false;
 
             SetTheme();
             SetFontSize();
@@ -237,99 +239,12 @@ namespace VisiBoole.Models
             int loc = isDel ? SelectionStart : (SelectionStart - len); // The location of the edit
             string edit = isDel ? LastText.Substring(loc, len) : Text.Substring(loc, len); // Gets the edit string
 
-            if (Text.Length > 0)
+            if (Text.Length != 0 && edit == "\t")
             {
-                // Check for special edits such as tabs, quotes and grouping characters
-                List<string> specialEdits = new List<string> { "\t", "\"", "[", "{", "(" };
-                if (specialEdits.Contains(edit))
-                {
-                    // Edit is a special edit
-                    int lineNumber = GetLineFromCharIndex(loc);
-                    string currentLine = Lines[lineNumber];
-                    int lastIndexOfLine = currentLine.Length - 1 + GetFirstCharIndexFromLine(lineNumber);
-                    int nextIndex = loc + 1;
-                    bool isLastIndexOfLine = (loc == lastIndexOfLine);
-
-                    if (edit == "\t")
-                    {
-                        Text = Text.Remove(loc, 1); // Remove tab
-                        edit = new string(' ', 4);
-                        Text = Text.Insert(loc, edit); // Insert spaces for tab
-                        SelectionStart = loc + 4; // Restore cursor location
-                    }
-                    else if (edit == "\"")
-                    {
-                        if (!isDel && isLastIndexOfLine && (currentLine[0] != '"' || currentLine.Length == 1))
-                        {
-                            // Change edit to ""
-                            Text = Text.Remove(loc, 1);
-                            edit = new string('\"', 2);
-                            Text = Text.Insert(loc, edit);
-                            SelectionStart = loc + 1;
-                        }
-                        else if (isDel && nextIndex <= (lastIndexOfLine + 1) && nextIndex < LastText.Length && Text[loc] == '"')
-                        {
-                            // Remove both ""
-                            Text = Text.Remove(loc, 1);
-                            edit = new string('\"', 2);
-                            SelectionStart = loc;
-                        }
-                    }
-                    else if (edit == "[")
-                    {
-                        if (!isDel && isLastIndexOfLine)
-                        {
-                            // Change edit to []
-                            Text = Text.Remove(loc, 1);
-                            edit = "[]";
-                            Text = Text.Insert(loc, edit);
-                            SelectionStart = loc + 1;
-                        }
-                        else if (isDel && nextIndex <= (lastIndexOfLine + 1) && nextIndex < LastText.Length && Text[loc] == ']')
-                        {
-                            // Remove both []
-                            Text = Text.Remove(loc, 1);
-                            edit = "[]";
-                            SelectionStart = loc;
-                        }
-                    }
-                    else if (edit == "{")
-                    {
-                        if (!isDel && isLastIndexOfLine)
-                        {
-                            // Change edit to {}
-                            Text = Text.Remove(loc, 1);
-                            edit = "{}";
-                            Text = Text.Insert(loc, edit);
-                            SelectionStart = loc + 1;
-                        }
-                        else if (isDel && nextIndex <= (lastIndexOfLine + 1) && nextIndex < LastText.Length && Text[loc] == '}')
-                        {
-                            // Remove both {}
-                            Text = Text.Remove(loc, 1);
-                            edit = "{}";
-                            SelectionStart = loc;
-                        }
-                    }
-                    else if (edit == "(")
-                    {
-                        if (!isDel && isLastIndexOfLine)
-                        {
-                            // Change edit to ()
-                            Text = Text.Remove(loc, 1);
-                            edit = "()";
-                            Text = Text.Insert(loc, edit);
-                            SelectionStart = loc + 1;
-                        }
-                        else if (isDel && nextIndex <= (lastIndexOfLine + 1) && nextIndex < LastText.Length && Text[loc] == ')')
-                        {
-                            // Remove both ()
-                            Text = Text.Remove(loc, 1);
-                            edit = "()";
-                            SelectionStart = loc;
-                        }
-                    }
-                }
+                Text = Text.Remove(loc, 1); // Remove tab
+                edit = new string(' ', 4);
+                Text = Text.Insert(loc, edit); // Insert spaces for tab
+                SelectionStart = loc + 4; // Restore cursor location
             }
 
             EditHistory.Push(isDel);

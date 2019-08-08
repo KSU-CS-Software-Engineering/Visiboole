@@ -159,11 +159,6 @@ namespace VisiBoole.ParsingEngine
         /// </summary>
         public static Regex LibraryStmtRegex = new Regex(@"^\s*#library\s+(?<Name>\S[^;]*)\s*;$", RegexOptions.Compiled);
 
-        /// <summary>
-        /// Regex for identifying submodule statements.
-        /// </summary>
-        private static Regex SubmoduleStmtRegex = new Regex($@"\s*(?<Instantiation>{InstantiationPattern})\({ModulePattern}\)\s*;", RegexOptions.Compiled);
-
         #endregion
 
         /// <summary>
@@ -196,7 +191,7 @@ namespace VisiBoole.ParsingEngine
                 if (ErrorLog.ContainsKey(i))
                 {
                     // Add the error to the error log
-                    errorLog.Add($"{i}: {ErrorLog[i]}");
+                    errorLog.Add($"Line {i}: {ErrorLog[i]}");
                 }
             }
 
@@ -217,7 +212,7 @@ namespace VisiBoole.ParsingEngine
 
             foreach (string inputList in CommaSeperatingRegex.Split(headerMatch.Groups["Inputs"].Value))
             {
-                foreach (string input in WhitespaceRegex.Split(inputList))
+                foreach (string input in WhitespaceRegex.Split(inputList.TrimEnd()))
                 {
                     if (input.Contains("[]"))
                     {
@@ -237,7 +232,7 @@ namespace VisiBoole.ParsingEngine
             foreach (string outputList in CommaSeperatingRegex.Split(headerMatch.Groups["Outputs"].Value))
             {
                 // Output each output var in the output list
-                foreach (string output in WhitespaceRegex.Split(outputList))
+                foreach (string output in WhitespaceRegex.Split(outputList.TrimEnd()))
                 {
                     if (output.Contains("[]"))
                     {
@@ -514,7 +509,7 @@ namespace VisiBoole.ParsingEngine
             // Clear design header
             Design.Database.Header = null;
             // Start line number counter
-            CurrentLineNumber = 0;
+            CurrentLineNumber = 1;
             // Line number of the header
             int headerLineNumber = -1;
             // Indicates whether a non header or library statement has been found
@@ -523,8 +518,6 @@ namespace VisiBoole.ParsingEngine
             // For each statement in the statement text list
             foreach (string statement in statementText)
             {
-                // Increment line number counter
-                CurrentLineNumber++;
                 // Get statement type
                 StatementType? type = string.IsNullOrWhiteSpace(statement) ? StatementType.Empty : GetStatementType(statement);
 
@@ -601,6 +594,9 @@ namespace VisiBoole.ParsingEngine
                     // Add statement and its type to the list of source code
                     sourceCode.Add(new SourceCode(statement, (StatementType)type));
                 }
+
+                // Increment line number counter
+                CurrentLineNumber += statement.Count(c => c == '\n') + 1;
             }
 
             // If not valid
@@ -651,12 +647,14 @@ namespace VisiBoole.ParsingEngine
                     expandedText = source.Text;
                 }
 
+                int lineCount = source.Text.Count(c => c == '\n') + 1;
+
                 // If expanded text is null
                 if (expandedText == null)
                 {
                     // Set valid to false
                     valid = false;
-                    CurrentLineNumber += source.Text.Count(c => c == '\n') + 1;
+                    CurrentLineNumber += lineCount;
                     // Continue to next source
                     continue;
                 }
@@ -692,7 +690,7 @@ namespace VisiBoole.ParsingEngine
                     i += expandedSourceText.Length - 1;
                 }
 
-                CurrentLineNumber += source.Text.Count(c => c == '\n') + 1;
+                CurrentLineNumber += lineCount;
             }
 
             if (Design.Database.Header != null && !Design.Database.Header.Valid)
@@ -1154,7 +1152,7 @@ namespace VisiBoole.ParsingEngine
                 var components = Design.Database.GetVectorComponents(token.Groups["Name"].Value)?.ToArray();
                 if (components == null)
                 {
-                    ErrorLog.Add(CurrentLineNumber, $"'{token.Value}' is missing an explicit dimension.");
+                    PendingErrorMessage = $"'{token.Value}' is missing an explicit dimension.";
                     return null;
                 }
 
@@ -1240,8 +1238,6 @@ namespace VisiBoole.ParsingEngine
         {
             // Get source text
             string source = sourceCode.Text;
-            // Get line count inside source
-            int lineCount = source.Count(c => c == '\n');
             // Get whether the source needs to be expanded
             bool needsExpansion = ExpansionRegex.IsMatch(source) || source.Contains(':');
 
@@ -1294,8 +1290,6 @@ namespace VisiBoole.ParsingEngine
                 }
             }
 
-            // Increment line number by the line count
-            CurrentLineNumber += lineCount;
             return source;
         }
 
@@ -1320,7 +1314,8 @@ namespace VisiBoole.ParsingEngine
                 var expansion = GetExpansion(match)?.ToArray();
                 if (expansion == null)
                 {
-                    ErrorLog.Add(GetLineNumber(expandedLine, match.Index), $"'{match.Value}' is missing an explicit dimension somewhere.");
+                    ErrorLog.Add(GetLineNumber(expandedLine, match.Index), PendingErrorMessage);
+                    PendingErrorMessage = null;
                     return null;
                 }
                 if (expansion.Length > maxExpansionCount)
@@ -1361,7 +1356,8 @@ namespace VisiBoole.ParsingEngine
                     var expansion = GetExpansion(match)?.ToArray();
                     if (expansion == null)
                     {
-                        ErrorLog.Add(GetLineNumber(expandedLine, match.Index), $"'{match.Value}' is missing an explicit dimension somewhere.");
+                        ErrorLog.Add(GetLineNumber(expandedLine, match.Index), PendingErrorMessage);
+                        PendingErrorMessage = null;
                         return null;
                     }
                     if (expansion.Length > maxExpansionCount)
@@ -1434,7 +1430,8 @@ namespace VisiBoole.ParsingEngine
                 // If expansion fails
                 if (dependentExpansion == null)
                 {
-                    ErrorLog.Add(GetLineNumber(line, dependentMatch.Index), $"'{dependent}' contains a [] notation that is missing an explicit dimension.");
+                    ErrorLog.Add(GetLineNumber(line, dependentMatch.Index), PendingErrorMessage);
+                    PendingErrorMessage = null;
                     return null;
                 }
             }
@@ -1444,6 +1441,7 @@ namespace VisiBoole.ParsingEngine
                 // If expansion fails
                 if (dependentExpansion == null)
                 {
+                    ErrorLog.Add(GetLineNumber(line, dependentMatch.Index), PendingErrorMessage);
                     return null;
                 }
             }
@@ -1459,7 +1457,6 @@ namespace VisiBoole.ParsingEngine
             {
                 if (!match.Value.Contains("=="))
                 {
-                    CurrentLineNumber = GetLineNumber(line, match.Index);
                     List<string> expansion;
                     bool canAdjust;
                     if (!match.Value.Contains("{"))
@@ -1476,6 +1473,8 @@ namespace VisiBoole.ParsingEngine
                     // If expansion fails
                     if (expansion == null)
                     {
+                        ErrorLog.Add(GetLineNumber(line, expressionIndex + match.Index), PendingErrorMessage);
+                        PendingErrorMessage = null;
                         return null;
                     }
 
